@@ -1,0 +1,3353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NégoContract — Suivi Clients</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1f2d45;
+    --accent: #00e5a0;
+    --accent2: #0070f3;
+    --red: #ff4757;
+    --orange: #ff9f43;
+    --text: #e8edf5;
+    --text2: #7a8ba8;
+    --text3: #4a5a72;
+    --green: #00e5a0;
+    --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Instrument Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* LAYOUT */
+  .app { display: flex; height: 100vh; overflow: hidden; }
+
+  /* SIDEBAR TOGGLE BUTTON */
+  .sidebar-toggle {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 200;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    transition: all 0.2s;
+    padding: 0;
+  }
+  .sidebar-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .sidebar-toggle .bar {
+    width: 16px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 2px;
+    transition: all 0.25s;
+    transform-origin: center;
+  }
+  .sidebar-toggle.open .bar:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+  .sidebar-toggle.open .bar:nth-child(2) { opacity: 0; transform: scaleX(0); }
+  .sidebar-toggle.open .bar:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+  }
+  .sidebar.collapsed {
+    width: 0;
+    border-right-width: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo-text span { color: var(--accent); }
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .sidebar-nav { padding: 12px 10px; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text2);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(0,229,160,0.1); color: var(--accent); }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .clients-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    background: var(--surface2);
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: auto;
+    color: var(--text3);
+  }
+
+  /* MAIN */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* TOPBAR */
+  .topbar {
+    padding: 16px 28px 16px 64px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 600px) {
+    .topbar {
+      padding: 10px 10px 10px 54px;
+      gap: 6px;
+    }
+    .search-wrap { order: 2; flex: 1 1 100%; max-width: 100%; }
+    .topbar .btn, #export-menu-wrap { order: 1; padding: 7px 10px; font-size: 12px; }
+    .topbar label.btn { padding: 7px 10px; font-size: 12px; }
+  }
+
+  .search-wrap {
+    flex: 1;
+    max-width: 460px;
+    position: relative;
+  }
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: var(--text3);
+  }
+  .search-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px 10px 40px;
+    color: var(--text);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent2); }
+  .search-input::placeholder { color: var(--text3); }
+
+  .btn {
+    padding: 9px 18px;
+    border-radius: 9px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover { background: #00ffb3; transform: translateY(-1px); }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .btn-secondary:hover { border-color: var(--accent2); color: var(--text); }
+
+  /* CONTENT */
+  .content { flex: 1; overflow-y: auto; padding: 28px; }
+  .content::-webkit-scrollbar { width: 4px; }
+  .content::-webkit-scrollbar-track { background: transparent; }
+  .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* STATS BAR */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; font-family: 'DM Mono', monospace; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.blue { color: var(--accent2); }
+  .stat-value.orange { color: var(--orange); }
+
+  /* CLIENT LIST */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: 6px;
+  }
+  .filter-tab {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text2);
+    transition: all 0.15s;
+    font-family: 'Instrument Sans', sans-serif;
+  }
+  .filter-tab.active { background: var(--surface2); color: var(--text); border-color: var(--accent2); }
+
+  .client-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+  }
+
+  .client-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .client-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--border);
+    transition: background 0.2s;
+  }
+  .client-card.match-green::before { background: var(--green); }
+  .client-card.match-red::before { background: var(--red); }
+  .client-card:hover { border-color: var(--accent2); transform: translateY(-2px); box-shadow: var(--card-shadow); }
+
+  .client-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .client-id {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    background: var(--surface2);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .client-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .client-phone { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: 'DM Mono', monospace; }
+
+  .match-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .match-badge.green { background: rgba(0,229,160,0.12); color: var(--green); border: 1px solid rgba(0,229,160,0.3); }
+  .match-badge.red { background: rgba(255,71,87,0.12); color: var(--red); border: 1px solid rgba(255,71,87,0.3); }
+  .match-badge.none { background: var(--surface2); color: var(--text3); border: 1px solid var(--border); }
+
+  .client-subs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 8px 0;
+  }
+  .sub-tag {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    background: var(--surface2);
+    color: var(--text2);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .client-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .total-label { font-size: 11px; color: var(--text3); }
+  .total-amount {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--orange);
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    width: 90%;
+    max-width: 680px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 28px;
+    transform: translateY(20px);
+    transition: transform 0.2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal::-webkit-scrollbar { width: 4px; }
+  .modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .modal-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; }
+  .close-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .close-btn:hover { background: var(--red); color: white; border-color: var(--red); }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-label { font-size: 12px; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-input, .form-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 9px 13px;
+    color: var(--text);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--accent2); }
+  .form-select option { background: var(--surface); }
+
+  .section-sep {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 20px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* SUBSCRIPTION CARD IN FORM */
+  .sub-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .sub-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .sub-type-select {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .sub-type-btn {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text3);
+    font-family: 'Instrument Sans', sans-serif;
+    transition: all 0.15s;
+  }
+  .sub-type-btn.selected { color: #000; font-weight: 700; }
+  .sub-type-btn[data-type="mobile"].selected { background: #0070f3; border-color: #0070f3; color: #fff; }
+  .sub-type-btn[data-type="internet"].selected { background: #00e5a0; border-color: #00e5a0; color: #000; }
+  .sub-type-btn[data-type="streaming"].selected { background: #e50914; border-color: #e50914; color: #fff; }
+  .sub-type-btn[data-type="musique"].selected { background: #1db954; border-color: #1db954; color: #fff; }
+  .sub-type-btn[data-type="assurance"].selected { background: #ff9f43; border-color: #ff9f43; color: #000; }
+  .sub-type-btn[data-type="autre"].selected { background: #7a8ba8; border-color: #7a8ba8; color: #fff; }
+  .sub-card-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .sub-card-grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 8px; }
+  .sub-remove {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    background: rgba(255,71,87,0.1);
+    border: 1px solid rgba(255,71,87,0.3);
+    color: var(--red);
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .sub-remove:hover { background: var(--red); color: white; }
+
+  /* TYPE ICON BADGE */
+  .type-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .remove-btn {
+    width: 32px; height: 32px;
+    border-radius: 7px;
+    background: rgba(255,71,87,0.1);
+    border: 1px solid rgba(255,71,87,0.3);
+    color: var(--red);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .remove-btn:hover { background: var(--red); color: white; }
+  .add-sub-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text3);
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Instrument Sans', sans-serif;
+    width: 100%;
+    justify-content: center;
+    transition: all 0.15s;
+    margin-top: 4px;
+  }
+  .add-sub-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  .needs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  .need-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .need-label { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; }
+
+  .checkbox-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text2);
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .checkbox-item input { display: none; }
+  .checkbox-item.checked { background: rgba(0,112,243,0.1); border-color: var(--accent2); color: var(--text); }
+
+  .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+  /* OFFER PAGE */
+  .offer-section { margin-bottom: 28px; }
+  .offer-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 14px;
+  }
+  .offer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .offer-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .offer-operator {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 2px;
+    font-family: 'DM Mono', monospace;
+  }
+  .offer-specs {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+  }
+  .offer-spec {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 8px 14px;
+    text-align: center;
+  }
+  .spec-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .spec-label { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; margin-top: 2px; }
+  .offer-price {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--orange);
+  }
+  .offer-price span { font-size: 13px; color: var(--text3); font-family: 'Instrument Sans', sans-serif; font-weight: 400; }
+
+  .match-results { margin-top: 16px; }
+  .match-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'DM Mono', monospace; }
+  .match-list { display: flex; flex-direction: column; gap: 6px; }
+  .match-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .match-row.ok { background: rgba(0,229,160,0.08); border: 1px solid rgba(0,229,160,0.2); }
+  .match-row.ko { background: rgba(255,71,87,0.08); border: 1px solid rgba(255,71,87,0.2); }
+  .match-client { font-weight: 600; }
+  .match-savings { font-family: 'DM Mono', monospace; font-size: 12px; }
+  .match-savings.ok { color: var(--green); }
+  .match-savings.ko { color: var(--red); }
+
+  /* CLIENT DETAIL */
+  .detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-avatar {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: white;
+    flex-shrink: 0;
+  }
+  .detail-info { flex: 1; }
+  .detail-name { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+  .detail-meta { font-size: 13px; color: var(--text3); margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .detail-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .detail-block-title { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; font-family: 'DM Mono', monospace; margin-bottom: 12px; }
+
+  .sub-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .sub-list-item:last-child { border-bottom: none; }
+  .sub-name { color: var(--text); }
+  .sub-price { font-family: 'DM Mono', monospace; color: var(--orange); }
+
+  .need-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text2);
+    margin: 3px;
+  }
+  .need-tag.active { background: rgba(0,112,243,0.12); border-color: var(--accent2); color: var(--accent2); }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text3);
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: var(--text2); margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; }
+
+  /* OFFERS RIGHT SIDEBAR */
+  .offers-sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.3s, min-width 0.3s;
+    position: relative;
+  }
+  .offers-sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    border-left: none;
+  }
+  .offers-sidebar-header {
+    padding: 16px 14px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    white-space: nowrap;
+  }
+  .offers-sidebar-toggle {
+    position: fixed;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 38px;
+    height: 38px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    transition: right 0.3s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .offers-sidebar-toggle.open { right: 228px; }
+  .offer-tab {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .offer-tab:hover { background: var(--surface2); }
+  .offer-tab.active { background: rgba(0,112,243,0.12); border-left: 3px solid var(--accent2); }
+  .offer-tab-name { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+  .offer-tab-op { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .offer-tab-price { font-size: 12px; color: var(--accent2); font-weight: 700; margin-top: 3px; }
+  .offer-tab-match { font-size: 11px; color: var(--accent); margin-top: 2px; }
+
+  @media (max-width: 600px) {
+    .offers-sidebar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-height: 60vh;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      z-index: 300;
+      box-shadow: 0 -8px 32px rgba(0,0,0,0.4);
+      overflow-y: auto;
+      transition: transform 0.3s ease;
+      transform: translateY(0);
+    }
+    .offers-sidebar.collapsed {
+      transform: translateY(100%);
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+    .offers-sidebar-toggle {
+      display: flex;
+      right: 16px;
+      bottom: 16px;
+      top: auto;
+      transform: none;
+    }
+    .offers-sidebar-toggle.open {
+      right: 16px;
+      bottom: calc(60vh + 8px);
+    }
+  }
+
+  /* PAGE VIEWS */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* MOBILE RESPONSIVE */
+  @media (max-width: 600px) {
+    .stats-bar { grid-template-columns: 1fr 1fr; }
+    .client-grid { grid-template-columns: 1fr; }
+    .modal { padding: 18px; width: 96%; }
+    .form-grid { grid-template-columns: 1fr; }
+    .sub-card-grid { grid-template-columns: 1fr; }
+    .sub-card-grid-2 { grid-template-columns: 1fr; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .needs-grid { grid-template-columns: 1fr 1fr; }
+    .content { padding: 16px; }
+    .filter-tabs { flex-wrap: wrap; }
+    .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  }
+
+  /* ANIMATIONS */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .client-card { animation: fadeIn 0.2s ease both; }
+
+  /* URGENCY PULSE */
+  @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(255,71,87,0.4); } 50% { box-shadow: 0 0 0 6px rgba(255,71,87,0); } }
+  .client-card.urgent { border-color: rgba(255,71,87,0.5); animation: fadeIn 0.2s ease both, pulse-red 2s infinite; }
+  .client-card.soon { border-color: rgba(255,159,67,0.5); }
+
+  /* ALERT BADGE */
+  .alert-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background: var(--red);
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+    font-family: 'DM Mono', monospace;
+    padding: 0 4px;
+    margin-left: auto;
+    animation: pulse-red 2s infinite;
+  }
+
+  /* DATE SELECTS in sub card */
+  .date-selects { display: flex; gap: 6px; }
+  .date-selects select { flex: 1; }
+
+  /* ECHEANCE ITEM */
+  .ech-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ech-item:hover { border-color: var(--accent2); }
+  .ech-item.urgent { border-color: rgba(255,71,87,0.5); background: rgba(255,71,87,0.05); }
+  .ech-item.soon { border-color: rgba(255,159,67,0.4); background: rgba(255,159,67,0.05); }
+  .ech-days {
+    min-width: 60px;
+    text-align: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+  }
+  .ech-days.urgent { color: var(--red); }
+  .ech-days.soon { color: var(--orange); }
+  .ech-days-label { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; }
+  .ech-info { flex: 1; }
+  .ech-client { font-weight: 700; font-size: 15px; }
+  .ech-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .ech-date { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); text-align: right; }
+
+  .tag-int {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    background: rgba(0,112,243,0.12);
+    color: var(--accent2);
+    border: 1px solid rgba(0,112,243,0.2);
+  }
+
+  /* LOADING SCREEN */
+  #loading-screen {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999; gap: 16px;
+  }
+  .loader-ring {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-screen p { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text3); }
+</style>
+</head>
+<body>
+<button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">
+  <span class="bar"></span>
+  <span class="bar"></span>
+  <span class="bar"></span>
+</button>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar collapsed">
+    <div class="logo">
+      <div class="logo-text">Négo<span>Contract</span></div>
+      <div class="logo-sub">Gestion clientèle</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showPage('clients')" id="nav-clients">
+        <span class="nav-icon">👥</span>
+        <span>Clients</span>
+        <span class="clients-count" id="clients-count-badge">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('offers')" id="nav-offers">
+        <span class="nav-icon">🎯</span>
+        <span>Offres</span>
+        <span class="clients-count" id="offers-count-badge">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('matching')" id="nav-matching">
+        <span class="nav-icon">⚡</span>
+        <span>Matching</span>
+      </div>
+      <div class="nav-item" onclick="showPage('echeances')" id="nav-echeances">
+        <span class="nav-icon">⏰</span>
+        <span>Échéances</span>
+        <span id="ech-badge" style="display:none;" class="alert-badge">0</span>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="search-input" type="text" placeholder="Rechercher un client par nom, ID ou téléphone..." oninput="searchClients(this.value)">
+      </div>
+      <div style="position:relative;display:inline-block;" id="export-menu-wrap">
+        <button class="btn btn-secondary" onclick="toggleExportMenu()" title="Exporter les données">📤 Exporter ▾</button>
+        <div id="export-menu" style="display:none;position:absolute;top:110%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;z-index:50;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+          <div onclick="exportData()" style="padding:10px 16px;cursor:pointer;font-size:13px;color:var(--text2);transition:background 0.15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">⬇️ Télécharger fichier .json</div>
+          <div onclick="exportCopy()" style="padding:10px 16px;cursor:pointer;font-size:13px;color:var(--text2);border-top:1px solid var(--border);transition:background 0.15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">📋 Copier le texte</div>
+        </div>
+      </div>
+      <div style="position:relative;display:inline-block;" id="import-menu-wrap">
+        <button class="btn btn-secondary" onclick="toggleImportMenu()" title="Importer les données">📥 Importer ▾</button>
+        <div id="import-menu" style="display:none;position:absolute;top:110%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;z-index:50;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+          <label style="display:block;padding:10px 16px;cursor:pointer;font-size:13px;color:var(--text2);transition:background 0.15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+            ⬆️ Importer un fichier .json
+            <input type="file" accept=".json" onchange="importData(event)" style="display:none;">
+          </label>
+          <div onclick="openImportPaste()" style="padding:10px 16px;cursor:pointer;font-size:13px;color:var(--text2);border-top:1px solid var(--border);transition:background 0.15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">📋 Coller le texte</div>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="openAddOffer()">+ Offre</button>
+      <button class="btn btn-primary" onclick="openAddClient()">+ Client</button>
+      <button class="btn btn-secondary" onclick="openSettings()" title="Paramètres sync">⚙️</button>
+      <span id="sync-indicator" style="font-size:11px;font-family:'DM Mono',monospace;white-space:nowrap;color:var(--text3);"></span>
+    </div>
+
+    <!-- CLIENTS PAGE -->
+    <div class="content page active" id="page-clients">
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-label">Total clients</div>
+          <div class="stat-value accent" id="stat-total">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Budget mensuel total</div>
+          <div class="stat-value orange" id="stat-budget">0 €</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Clients matchés</div>
+          <div class="stat-value blue" id="stat-matched">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Économies potentielles</div>
+          <div class="stat-value accent" id="stat-savings">0 €</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Liste des clients</div>
+        <div class="filter-tabs">
+          <button class="filter-tab active" onclick="filterClients('all', this)">Tous</button>
+          <button class="filter-tab" onclick="filterClients('green', this)">✅ Matchés</button>
+          <button class="filter-tab" onclick="filterClients('red', this)">❌ Non matchés</button>
+          <button class="filter-tab" onclick="filterClients('none', this)">— Sans offre</button>
+        </div>
+      </div>
+
+      <div class="client-grid" id="client-grid">
+        <div class="empty-state" id="empty-clients" style="grid-column: 1/-1;">
+          <div class="empty-icon">👤</div>
+          <div class="empty-title">Aucun client encore</div>
+          <div class="empty-sub">Cliquez sur "+ Client" pour ajouter votre premier client</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OFFERS PAGE -->
+    <div class="content page" id="page-offers">
+      <div class="section-header">
+        <div class="section-title">📋 Offres opérateurs</div>
+        <button class="btn btn-primary" onclick="openAddOffer()">+ Nouvelle offre</button>
+      </div>
+      <div id="offers-list">
+        <div class="empty-state">
+          <div class="empty-icon">📦</div>
+          <div class="empty-title">Aucune offre enregistrée</div>
+          <div class="empty-sub">Créez des offres pour les comparer avec vos clients</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MATCHING PAGE -->
+    <div class="content page" id="page-matching">
+      <div class="section-header">
+        <div class="section-title">⚡ Vue matching global</div>
+      </div>
+      <div id="matching-content">
+        <div class="empty-state">
+          <div class="empty-icon">⚡</div>
+          <div class="empty-title">Ajoutez des clients et des offres</div>
+          <div class="empty-sub">Le matching s'affichera automatiquement ici</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ECHEANCES PAGE -->
+    <div class="content page" id="page-echeances">
+      <div class="section-header">
+        <div class="section-title">⏰ Fins de contrat à venir</div>
+      </div>
+      <div id="echeances-content">
+        <div class="empty-state">
+          <div class="empty-icon">📅</div>
+          <div class="empty-title">Aucune échéance renseignée</div>
+          <div class="empty-sub">Ajoutez des dates de fin de contrat dans les fiches clients</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- BARRE DROITE OFFRES -->
+  <aside class="offers-sidebar" id="offers-sidebar">
+    <div class="offers-sidebar-header">
+      <span>🎯 Offres</span>
+      <button onclick="toggleOffersSidebar()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;">×</button>
+    </div>
+    <div id="offers-sidebar-list"></div>
+    <div style="padding:10px;">
+      <button class="btn btn-primary" onclick="openAddOffer()" style="width:100%;font-size:12px;">+ Nouvelle offre</button>
+    </div>
+  </aside>
+</div>
+
+<!-- BOUTON TOGGLE OFFRES DROITE -->
+<button class="offers-sidebar-toggle" id="offers-sidebar-toggle" onclick="toggleOffersSidebar()" title="Offres">
+  🎯<span id="offers-toggle-count" style="position:absolute;top:-4px;right:-4px;background:var(--accent2);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;"></span>
+</button>
+
+<!-- MODAL SETTINGS -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <div class="modal-title">⚙️ Paramètres de synchronisation</div>
+      <button class="close-btn" onclick="closeModal('modal-settings')">×</button>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6;">
+        Pour synchroniser entre votre Mac et votre iPhone, collez l'<strong>ID du bin</strong> ci-dessous sur chaque appareil. L'ID est créé automatiquement au premier lancement sur votre Mac.
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">ID du bin JSONBin</label>
+        <div style="display:flex;gap:8px;">
+          <input class="form-input" id="settings-bin-id" placeholder="ex: 64a3f8c2e1b..." style="flex:1;font-family:'DM Mono',monospace;font-size:12px;">
+          <button class="btn btn-primary" onclick="saveBinId()">Enregistrer</button>
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px;" id="settings-bin-status"></div>
+      </div>
+
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">📋 Comment récupérer l'ID sur votre Mac :</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+          1. Ouvrez l'app sur votre <strong>Mac</strong><br>
+          2. Appuyez sur <strong>F12</strong> → onglet <strong>Console</strong><br>
+          3. Tapez : <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;">localStorage.getItem('ncc_bin_id')</code><br>
+          4. Copiez l'ID affiché<br>
+          5. Collez-le ici sur votre iPhone
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:16px;">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">État actuel :</div>
+      <div id="settings-current-id" style="font-size:12px;font-family:'DM Mono',monospace;color:var(--text2);word-break:break-all;"></div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-settings')">Fermer</button>
+      <button class="btn btn-secondary" onclick="forceSync()" style="color:var(--accent);">🔄 Forcer la sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ACTION CLIENT (appui long) -->
+<div class="modal-overlay" id="modal-client-action">
+  <div class="modal" style="max-width:340px;text-align:center;">
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;" id="action-client-name"></div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:20px;">Que voulez-vous faire ?</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-primary" style="width:100%;" onclick="actionEditClient()">✏️ Modifier le client</button>
+      <button class="btn" style="width:100%;background:var(--red);color:#fff;border-color:var(--red);" onclick="actionDeleteClient()">🗑️ Supprimer le client</button>
+      <button class="btn btn-secondary" style="width:100%;" onclick="closeModal('modal-client-action')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DELETE CLIENT -->
+<div class="modal-overlay" id="modal-delete-client">
+  <div class="modal" style="max-width:400px;text-align:center;">
+    <div style="font-size:40px;margin-bottom:12px;">🗑️</div>
+    <div class="modal-title" style="margin-bottom:8px;">Supprimer ce client ?</div>
+    <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;" id="delete-client-name"></div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:24px;">Cette action est irréversible.</div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-delete-client')">Annuler</button>
+      <button class="btn" style="background:var(--red);color:#fff;border-color:var(--red);" onclick="doDeleteClient()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORT PASTE -->
+<div class="modal-overlay" id="modal-import-paste">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 Coller la sauvegarde</div>
+      <button class="close-btn" onclick="closeModal('modal-import-paste')">×</button>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Collez ici le texte copié depuis une exportation précédente, puis appuyez sur <strong>"Importer"</strong>.</p>
+    <textarea id="import-textarea" style="width:100%;height:200px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;resize:vertical;outline:none;" placeholder="Collez votre sauvegarde ici..."></textarea>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="importFromPaste()">📥 Importer</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-import-paste')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EXPORT COPY -->
+<div class="modal-overlay" id="modal-export">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 Copier la sauvegarde</div>
+      <button class="close-btn" onclick="closeModal('modal-export')">×</button>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">
+      Sur <strong>mobile</strong> : appuyez sur <strong>"Tout sélectionner"</strong> ci-dessous, puis copiez et collez dans <strong>Notes</strong> ou <strong>Mail</strong> pour sauvegarder.<br>
+      Sur <strong>Mac</strong> : faites <strong>Ctrl+A</strong> puis <strong>Ctrl+C</strong>, collez dans un fichier texte enregistré en <strong>.json</strong>.
+    </p>
+    <textarea id="export-textarea" style="width:100%;height:180px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;resize:vertical;outline:none;" readonly></textarea>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="copyExportText()">📋 Tout copier</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-export')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADD CLIENT -->
+<div class="modal-overlay" id="modal-client">
+  <div class="modal" style="max-width:740px;">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-client-title">➕ Nouveau client</div>
+      <button class="close-btn" onclick="closeModal('modal-client')">×</button>
+    </div>
+
+    <div class="section-sep">👤 Identité</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Prénom</label>
+        <input class="form-input" id="c-firstname" placeholder="Jean">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nom</label>
+        <input class="form-input" id="c-lastname" placeholder="Dupont">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Téléphone</label>
+        <input class="form-input" id="c-phone" placeholder="06 12 34 56 78">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="c-email" placeholder="jean@email.com" type="email">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Adresse postale</label>
+        <input class="form-input" id="c-address" placeholder="12 rue de la Paix, 75001 Paris">
+      </div>
+    </div>
+
+    <div class="section-sep">📦 Abonnements du foyer</div>
+    <div id="subs-container"></div>
+    <button class="add-sub-btn" onclick="addSubRow()">＋ Ajouter un abonnement</button>
+
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-client')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveClient()">Enregistrer le client</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADD OFFER -->
+<div class="modal-overlay" id="modal-offer">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <div class="modal-title">🎯 Nouvelle offre opérateur</div>
+      <button class="close-btn" onclick="closeModal('modal-offer')">×</button>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Type d'offre</div>
+      <div class="sub-type-select" id="offer-type-btns">
+        <button type="button" class="sub-type-btn" data-type="mobile" onclick="selectOfferType(this)">📱 Mobile</button>
+        <button type="button" class="sub-type-btn" data-type="internet" onclick="selectOfferType(this)">🌐 Internet</button>
+        <button type="button" class="sub-type-btn" data-type="streaming" onclick="selectOfferType(this)">🎬 Streaming</button>
+        <button type="button" class="sub-type-btn" data-type="musique" onclick="selectOfferType(this)">🎵 Musique</button>
+        <button type="button" class="sub-type-btn" data-type="assurance" onclick="selectOfferType(this)">🛡️ Assurance</button>
+        <button type="button" class="sub-type-btn" data-type="autre" onclick="selectOfferType(this)">📦 Autre</button>
+      </div>
+    </div>
+
+    <!-- CHAMPS COMMUNS -->
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Nom de l'offre</label>
+        <input class="form-input" id="o-name" placeholder="ex: Forfait 100Go, Bbox Must...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Opérateur / Marque</label>
+        <select class="form-select" id="o-operator" onchange="checkNewOperator(this)">
+          <option value="">— Choisir —</option>
+        </select>
+        <div id="new-operator-wrap" style="display:none;margin-top:6px;">
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <input class="form-input" id="o-operator-new" placeholder="Nom du nouvel opérateur..." style="flex:1;">
+            <button type="button" class="btn btn-secondary" onclick="addNewOperator()" style="white-space:nowrap;">+ Ajouter</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prix mensuel (€)</label>
+        <input class="form-input" id="o-price" placeholder="ex: 19.99" type="number">
+      </div>
+    </div>
+
+    <!-- CHAMPS MOBILE -->
+    <div id="o-fields-mobile" style="display:none;">
+      <div style="font-size:11px;color:var(--accent2);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 8px;">📱 Détails Mobile</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Data</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input class="form-input" id="o-data" placeholder="Go" type="number" style="flex:1;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);white-space:nowrap;">
+              <input type="checkbox" id="o-data-illimite" onchange="toggleOfferDataGo(this)" style="accent-color:var(--accent2);">
+              Illimitée
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Appels</label>
+          <select class="form-select" id="o-calls">
+            <option value="illimité">Illimités</option>
+            <option value="1h">1h</option><option value="2h">2h</option><option value="3h">3h</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SMS</label>
+          <select class="form-select" id="o-sms">
+            <option value="illimité">Illimités</option>
+            <option value="100">100</option><option value="500">500</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Engagement</label>
+          <select class="form-select" id="o-engagement">
+            <option value="">Sans engagement</option>
+            <option value="12 mois">12 mois</option>
+            <option value="24 mois">24 mois</option>
+          </select>
+        </div>
+      </div>
+      <div class="section-sep">Options incluses</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;" id="offer-options">
+        <div class="checkbox-item" onclick="toggleCheck(this)" data-val="international"><input type="checkbox"> 🌍 International</div>
+        <div class="checkbox-item" onclick="toggleCheck(this)" data-val="roaming"><input type="checkbox"> ✈️ Roaming EU</div>
+        <div class="checkbox-item" onclick="toggleCheck(this)" data-val="5g"><input type="checkbox"> 📶 5G</div>
+        <div class="checkbox-item" onclick="toggleCheck(this)" data-val="fixe"><input type="checkbox"> 🏠 Ligne fixe</div>
+        <div class="checkbox-item" onclick="toggleCheck(this)" data-val="multi"><input type="checkbox"> 👨‍👩‍👧 Multi-lignes</div>
+        <div class="checkbox-item" onclick="toggleCheck(this)" data-val="illimite"><input type="checkbox"> ♾️ Data illimitée</div>
+      </div>
+    </div>
+
+    <!-- CHAMPS INTERNET -->
+    <div id="o-fields-internet" style="display:none;">
+      <div style="font-size:11px;color:var(--accent);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 8px;">🌐 Détails Internet</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Débit (Mb/s)</label>
+          <input class="form-input" id="o-debit" placeholder="ex: 500" type="number">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type de connexion</label>
+          <select class="form-select" id="o-connexion">
+            <option value="">— Choisir —</option>
+            <option value="Fibre">Fibre</option><option value="ADSL">ADSL</option>
+            <option value="4G Box">4G Box</option><option value="5G Box">5G Box</option><option value="Câble">Câble</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Engagement</label>
+          <select class="form-select" id="o-engagement-web">
+            <option value="">Sans engagement</option>
+            <option value="12 mois">12 mois</option>
+            <option value="24 mois">24 mois</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);cursor:pointer;">
+          <input type="checkbox" id="o-tv" onchange="toggleOfferTv(this)" style="accent-color:var(--accent2);width:15px;height:15px;">
+          TV incluse
+        </label>
+        <div id="o-tv-price-wrap" style="display:none;margin-top:8px;display:none;">
+          <label class="form-label">Prix TV (€/mois)</label>
+          <input class="form-input" id="o-tv-price" type="number" placeholder="ex: 5" style="max-width:120px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAMPS STREAMING -->
+    <div id="o-fields-streaming" style="display:none;">
+      <div style="font-size:11px;color:#e50914;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 8px;">🎬 Détails Streaming</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Qualité vidéo max</label>
+          <select class="form-select" id="o-qualite">
+            <option value="">— Choisir —</option>
+            <option value="SD">SD</option><option value="HD">HD</option>
+            <option value="Full HD">Full HD</option><option value="4K">4K</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Écrans simultanés</label>
+          <select class="form-select" id="o-ecrans">
+            <option value="1">1 écran</option><option value="2">2 écrans</option>
+            <option value="3">3 écrans</option><option value="4">4 écrans</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Profils / Comptes</label>
+          <input class="form-input" id="o-profils" type="number" placeholder="ex: 5">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Engagement</label>
+          <select class="form-select" id="o-engagement-stream">
+            <option value="">Sans engagement</option>
+            <option value="1 an">1 an</option><option value="2 ans">2 ans</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;">
+          <input type="checkbox" id="o-stream-download" style="accent-color:var(--accent2);width:14px;height:14px;"> Téléchargement offline
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;">
+          <input type="checkbox" id="o-stream-famille" style="accent-color:var(--accent2);width:14px;height:14px;"> Offre famille
+        </label>
+      </div>
+    </div>
+
+    <!-- CHAMPS MUSIQUE -->
+    <div id="o-fields-musique" style="display:none;">
+      <div style="font-size:11px;color:#1db954;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 8px;">🎵 Détails Musique</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Écoute offline</label>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--text2);cursor:pointer;">
+            <input type="checkbox" id="o-music-offline" style="accent-color:var(--accent2);width:14px;height:14px;"> Incluse
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Comptes inclus</label>
+          <input class="form-input" id="o-music-comptes" type="number" placeholder="ex: 1, 6 (famille)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Qualité audio</label>
+          <select class="form-select" id="o-music-qualite">
+            <option value="">— Choisir —</option>
+            <option value="Standard">Standard</option>
+            <option value="Haute qualité">Haute qualité</option>
+            <option value="Lossless">Lossless / HiFi</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAMPS ASSURANCE -->
+    <div id="o-fields-assurance" style="display:none;">
+      <div style="font-size:11px;color:var(--orange);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 8px;">🛡️ Catégorie d'assurance</div>
+      <div class="sub-type-select" id="assur-sub-btns" style="margin-bottom:14px;">
+        <button type="button" class="sub-type-btn" data-type="tech" onclick="selectAssurSub(this)">📱 High-Tech</button>
+        <button type="button" class="sub-type-btn" data-type="auto" onclick="selectAssurSub(this)">🚗 Auto</button>
+        <button type="button" class="sub-type-btn" data-type="habitation" onclick="selectAssurSub(this)">🏠 Habitation</button>
+      </div>
+
+      <!-- COMMUN ASSURANCE -->
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div class="form-group">
+          <label class="form-label">Franchise (€)</label>
+          <input class="form-input" id="o-assur-franchise" type="number" placeholder="ex: 150">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Délai de carence</label>
+          <input class="form-input" id="o-assur-carence" placeholder="ex: 30 jours">
+        </div>
+      </div>
+
+      <!-- HIGH-TECH -->
+      <div id="o-assur-tech" style="display:none;">
+        <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Couverture</div>
+        <div class="form-grid" style="margin-bottom:8px;">
+          <div class="form-group">
+            <label class="form-label">Type de couverture</label>
+            <select class="form-select" id="o-assur-type">
+              <option value="">— Choisir —</option>
+              <option value="Casse">Casse</option>
+              <option value="Vol">Vol</option>
+              <option value="Casse + Vol">Casse + Vol</option>
+              <option value="Tous risques">Tous risques</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Appareils couverts</label>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <select class="form-select" id="o-assur-appareil-select" style="flex:1;">
+              <option value="">— Ajouter un appareil —</option>
+              <option value="📱 Smartphone">📱 Smartphone</option>
+              <option value="📟 Tablette">📟 Tablette</option>
+              <option value="💻 Ordinateur portable">💻 Ordinateur portable</option>
+              <option value="🖥️ Ordinateur fixe">🖥️ Ordinateur fixe</option>
+              <option value="⌚ Montre connectée">⌚ Montre connectée</option>
+              <option value="📺 Télévision">📺 Télévision</option>
+              <option value="🎮 Console de jeux">🎮 Console de jeux</option>
+              <option value="📷 Appareil photo">📷 Appareil photo</option>
+              <option value="📦 Autre appareil">📦 Autre appareil</option>
+            </select>
+            <button type="button" class="btn btn-secondary" onclick="addAssurAppareil()" style="white-space:nowrap;">+ Ajouter</button>
+          </div>
+          <div id="o-assur-appareils-list"></div>
+        </div>
+      </div>
+
+      <!-- AUTO -->
+      <div id="o-assur-auto" style="display:none;">
+        <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Couverture Auto</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Niveau de couverture</label>
+            <select class="form-select" id="o-auto-niveau">
+              <option value="">— Choisir —</option>
+              <option value="Tiers simple">Tiers simple (RC uniquement)</option>
+              <option value="Tiers étendu">Tiers étendu (+ vol, incendie)</option>
+              <option value="Tous risques">Tous risques</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Véhicule couvert</label>
+            <select class="form-select" id="o-auto-vehicule">
+              <option value="">— Choisir —</option>
+              <option value="Voiture">🚗 Voiture</option>
+              <option value="Moto">🏍️ Moto</option>
+              <option value="Utilitaire">🚐 Utilitaire</option>
+              <option value="Camping-car">🚌 Camping-car</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valeur assurée (€)</label>
+            <input class="form-input" id="o-auto-valeur" type="number" placeholder="ex: 15000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Remboursement véhicule</label>
+            <select class="form-select" id="o-auto-remboursement">
+              <option value="">— Choisir —</option>
+              <option value="Valeur d'achat">Valeur d'achat</option>
+              <option value="Valeur vénale">Valeur vénale</option>
+              <option value="À neuf (jusqu'à X ans)">À neuf (jusqu'à X ans)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-auto-protection-juridique" style="accent-color:var(--accent2);width:14px;height:14px;"> Protection juridique</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-auto-assistance" style="accent-color:var(--accent2);width:14px;height:14px;"> Assistance 0 km</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-auto-conducteur" style="accent-color:var(--accent2);width:14px;height:14px;"> Garantie conducteur</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-auto-pret-vehicule" style="accent-color:var(--accent2);width:14px;height:14px;"> Prêt de véhicule</label>
+        </div>
+      </div>
+
+      <!-- HABITATION -->
+      <div id="o-assur-habitation" style="display:none;">
+        <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Couverture Habitation</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Type de logement</label>
+            <select class="form-select" id="o-hab-type">
+              <option value="">— Choisir —</option>
+              <option value="Appartement">🏢 Appartement</option>
+              <option value="Maison">🏠 Maison</option>
+              <option value="Studio">🏠 Studio</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Statut</label>
+            <select class="form-select" id="o-hab-statut">
+              <option value="">— Choisir —</option>
+              <option value="Locataire">Locataire</option>
+              <option value="Propriétaire">Propriétaire</option>
+              <option value="Colocataire">Colocataire</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Capital mobilier assuré (€)</label>
+            <input class="form-input" id="o-hab-capital" type="number" placeholder="ex: 20000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Surface (m²)</label>
+            <input class="form-input" id="o-hab-surface" type="number" placeholder="ex: 65">
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-hab-dommages" style="accent-color:var(--accent2);width:14px;height:14px;"> Dommages électriques</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-hab-bris-glace" style="accent-color:var(--accent2);width:14px;height:14px;"> Bris de glace</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-hab-vol" style="accent-color:var(--accent2);width:14px;height:14px;"> Vol / Vandalisme</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-hab-pj" style="accent-color:var(--accent2);width:14px;height:14px;"> Protection juridique</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;"><input type="checkbox" id="o-hab-jardin" style="accent-color:var(--accent2);width:14px;height:14px;"> Dépendances / Jardin</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAMPS AUTRE -->
+    <div id="o-fields-autre" style="display:none;">
+      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 8px;">📦 Détails</div>
+      <div class="form-group">
+        <label class="form-label">Description / Options</label>
+        <input class="form-input" id="o-autre-desc" placeholder="Décrivez l'offre...">
+      </div>
+    </div>
+
+    <!-- FRAIS & NOTES (communs) -->
+    <div class="form-group" style="margin-top:16px;">
+      <label class="form-label">Frais de mise en service (€)</label>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <input class="form-input" id="o-frais" type="number" placeholder="ex: 49" style="max-width:140px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text2);">
+          <input type="checkbox" id="o-frais-offerts" onchange="toggleFrais(this)" style="width:15px;height:15px;accent-color:var(--accent2);cursor:pointer;">
+          Offerts
+        </label>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:12px;">
+      <label class="form-label">Notes</label>
+      <input class="form-input" id="o-notes" placeholder="Conditions, remarques...">
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-offer')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveOffer()">Enregistrer l'offre</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CLIENT DETAIL -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal" style="max-width: 780px;">
+    <div class="modal-header">
+      <div class="modal-title">Fiche client</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" id="btn-edit-client" onclick="editCurrentClient()" style="padding:6px 14px;font-size:13px;">✏️ Modifier</button>
+        <button class="close-btn" onclick="closeModal('modal-detail')">×</button>
+      </div>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<script>
+// ---- JSONBIN CONFIG ----
+const JSONBIN_KEY = '$2a$10$9PgTZ53gw/thbI8ON8iPUOR4lfPJOcEHUFMduRbScDD6blrJVg7FC';
+const JSONBIN_URL = 'https://api.jsonbin.io/v3/b';
+let BIN_ID = localStorage.getItem('ncc_bin_id') || null;
+let saveTimeout = null;
+let isSaving = false;
+
+// ---- STATE ----
+let clients = [];
+let offers = [];
+let currentFilter = 'all';
+let currentSearch = '';
+let editingClientId = null;
+let currentDetailClientId = null;
+
+// ---- UTILS ----
+function genId() { return 'C' + Date.now().toString(36).toUpperCase(); }
+function genOId() { return 'O' + Date.now().toString(36).toUpperCase(); }
+
+// ---- SYNC STATUS ----
+function setSyncStatus(msg, color) {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color || 'var(--text3)';
+}
+
+// ---- SAVE TO JSONBIN ----
+function save() {
+  // Keep localStorage as backup
+  localStorage.setItem('ncc_clients', JSON.stringify(clients));
+  localStorage.setItem('ncc_offers', JSON.stringify(offers));
+  // Debounce cloud save
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => saveToCloud(), 1000);
+}
+
+async function saveToCloud() {
+  if (isSaving) return;
+  isSaving = true;
+  setSyncStatus('⏳ Sauvegarde...', 'var(--orange)');
+  const data = {
+    clients, offers,
+    customOperators: JSON.parse(localStorage.getItem('ncc_operators') || '[]'),
+    customUsers: JSON.parse(localStorage.getItem('ncc_users') || '[]'),
+    customConnexions: JSON.parse(localStorage.getItem('ncc_connexions') || '[]'),
+    savedAt: new Date().toISOString()
+  };
+  try {
+    if (BIN_ID) {
+      // Update existing bin
+      await fetch(`${JSONBIN_URL}/${BIN_ID}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
+        body: JSON.stringify(data)
+      });
+    } else {
+      // Create new bin
+      const res = await fetch(JSONBIN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Name': 'NegoCRM' },
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      BIN_ID = json.metadata.id;
+      localStorage.setItem('ncc_bin_id', BIN_ID);
+    }
+    setSyncStatus('✓ Synchronisé', 'var(--accent)');
+    setTimeout(() => setSyncStatus('', ''), 3000);
+  } catch(e) {
+    setSyncStatus('⚠️ Hors ligne', 'var(--red)');
+  }
+  isSaving = false;
+}
+
+// ---- LOAD FROM JSONBIN ----
+async function loadFromCloud() {
+  setSyncStatus('⏳ Chargement...', 'var(--orange)');
+  try {
+    if (BIN_ID) {
+      const res = await fetch(`${JSONBIN_URL}/${BIN_ID}/latest`, {
+        headers: { 'X-Master-Key': JSONBIN_KEY }
+      });
+      const json = await res.json();
+      const data = json.record;
+      clients = data.clients || [];
+      offers = data.offers || [];
+      if (data.customOperators) localStorage.setItem('ncc_operators', JSON.stringify(data.customOperators));
+      if (data.customUsers) localStorage.setItem('ncc_users', JSON.stringify(data.customUsers));
+      if (data.customConnexions) localStorage.setItem('ncc_connexions', JSON.stringify(data.customConnexions));
+      setSyncStatus('✓ Synchronisé', 'var(--accent)');
+      setTimeout(() => setSyncStatus('', ''), 3000);
+    } else {
+      // Fallback to localStorage
+      clients = JSON.parse(localStorage.getItem('ncc_clients') || '[]');
+      offers = JSON.parse(localStorage.getItem('ncc_offers') || '[]');
+      setSyncStatus('📱 Local uniquement', 'var(--text3)');
+    }
+  } catch(e) {
+    // Fallback to localStorage if offline
+    clients = JSON.parse(localStorage.getItem('ncc_clients') || '[]');
+    offers = JSON.parse(localStorage.getItem('ncc_offers') || '[]');
+    setSyncStatus('⚠️ Hors ligne — données locales', 'var(--orange)');
+  }
+  renderClients();
+  renderOffers();
+  renderOffersSidebar();
+  updateEchBadge();
+  document.getElementById('offers-count-badge').textContent = offers.length;
+  document.getElementById('offers-sidebar').classList.add('collapsed');
+}
+
+// ---- URGENCY HELPERS ----
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const end = new Date(dateStr); end.setHours(0,0,0,0);
+  return Math.ceil((end - today) / 86400000);
+}
+
+function getClientUrgency(client) {
+  // Returns 'urgent' (<= 14j), 'soon' (<= 30j), or null
+  let level = null;
+  for (const s of client.subscriptions || []) {
+    if (!s.endDate) continue;
+    const d = daysUntil(s.endDate);
+    if (d !== null && d >= 0) {
+      if (d <= 14) return 'urgent';
+      if (d <= 30 && level !== 'urgent') level = 'soon';
+    }
+  }
+  return level;
+}
+
+function getAllEcheances() {
+  const list = [];
+  for (const c of clients) {
+    for (const s of c.subscriptions || []) {
+      if (!s.endDate) continue;
+      const d = daysUntil(s.endDate);
+      if (d !== null && d >= 0 && d <= 60) {
+        list.push({ client: c, sub: s, days: d });
+      }
+    }
+  }
+  return list.sort((a, b) => a.days - b.days);
+}
+
+function updateEchBadge() {
+  const urgent = getAllEcheances().filter(e => e.days <= 14).length;
+  const badge = document.getElementById('ech-badge');
+  if (urgent > 0) { badge.textContent = urgent; badge.style.display = 'inline-flex'; }
+  else { badge.style.display = 'none'; }
+}
+
+// ---- RENDER ECHEANCES ----
+function renderEcheances() {
+  const el = document.getElementById('echeances-content');
+  const list = getAllEcheances();
+
+  if (list.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Aucune échéance dans les 60 prochains jours</div><div class="empty-sub">Ajoutez des dates de fin de contrat dans les fiches clients</div></div>`;
+    return;
+  }
+
+  const urgents = list.filter(e => e.days <= 14);
+  const soon = list.filter(e => e.days > 14 && e.days <= 30);
+  const coming = list.filter(e => e.days > 30);
+
+  function renderGroup(title, items, cls) {
+    if (!items.length) return '';
+    return `<div style="margin-bottom:24px;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-family:'DM Mono',monospace;color:var(--text3);margin-bottom:10px;">${title}</div>
+      ${items.map(e => {
+        const typeInfo = { mobile:'📱', internet:'🌐', streaming:'🎬', musique:'🎵', assurance:'🛡️', autre:'📦' };
+        const icon = typeInfo[e.sub.type] || '📦';
+        const dateFormatted = new Date(e.sub.endDate).toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
+        return `<div class="ech-item ${cls}" onclick="openDetail('${e.client.id}')">
+          <div>
+            <div class="ech-days ${cls}">${e.days}</div>
+            <div class="ech-days-label">jours</div>
+          </div>
+          <div class="ech-info">
+            <div class="ech-client">${e.client.firstname} ${e.client.lastname}</div>
+            <div class="ech-sub">${icon} ${e.sub.name||'Abonnement'} ${e.sub.operator ? '— ' + e.sub.operator : ''}</div>
+          </div>
+          <div class="ech-date">
+            <div style="margin-bottom:2px;">Fin le</div>
+            <div style="font-weight:600;">${dateFormatted}</div>
+            <div style="margin-top:4px;font-size:11px;color:var(--orange);">${e.sub.price ? e.sub.price.toFixed(2) + ' €/mois' : ''}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  el.innerHTML =
+    renderGroup('🔴 Urgents — moins de 14 jours', urgents, 'urgent') +
+    renderGroup('🟠 Bientôt — 15 à 30 jours', soon, 'soon') +
+    renderGroup('🔵 À venir — 31 à 60 jours', coming, '');
+}
+
+// ---- NAV ----
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+
+  if (name === 'matching') renderMatching();
+  if (name === 'offers') renderOffers();
+  if (name === 'echeances') renderEcheances();
+}
+
+// ---- SEARCH ----
+function searchClients(q) {
+  currentSearch = q.toLowerCase();
+  renderClients();
+}
+
+// ---- FILTER ----
+function filterClients(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderClients();
+}
+
+// ---- MATCH LOGIC (best overall offer per client) ----
+function getClientMatch(client) {
+  if (offers.length === 0) return { status: 'none', offer: null, savings: 0 };
+
+  let bestMatch = null;
+  let bestSavings = -Infinity;
+
+  for (const offer of offers) {
+    if (matchScore(client, offer) === 0) continue;
+    // Find the matching subscription to calculate savings
+    const subs = (client.subscriptions || []).filter(s => s.type === offer.type);
+    for (const sub of subs) {
+      const savings = parseFloat(sub.price || 0) - parseFloat(offer.price || 0);
+      if (savings > bestSavings) { bestSavings = savings; bestMatch = offer; }
+    }
+  }
+
+  if (bestMatch && bestSavings > 0) return { status: 'green', offer: bestMatch, savings: bestSavings };
+  if (bestMatch) return { status: 'red', offer: bestMatch, savings: bestSavings };
+  return { status: 'none', offer: null, savings: 0 };
+}
+
+// ---- MATCH SCORE (per subscription vs offer) ----
+function matchScore(client, offer) {
+  // Find subscriptions of the same type
+  const subs = (client.subscriptions || []).filter(s => s.type === offer.type);
+  if (!subs.length) return 0;
+
+  for (const sub of subs) {
+    // Price must be lower than current subscription
+    if (parseFloat(offer.price) >= parseFloat(sub.price || 0)) continue;
+
+    // Type-specific needs check
+    if (offer.type === 'mobile') {
+      // Data : offre doit couvrir le besoin minimum (pas forcément ce qu'il a)
+      if (sub.needDataIllimite && !offer.dataIllimite) continue;
+      if (!sub.needDataIllimite && sub.needDataGo && !offer.dataIllimite && parseInt(offer.data||0) < parseInt(sub.needDataGo||0)) continue;
+      if (sub.needCalls && offer.calls !== 'illimité') continue;
+      if (sub.needSms && offer.sms !== 'illimité') continue;
+      if (sub.need5g && !(offer.options||[]).includes('5g')) continue;
+      if (sub.needInternational && !(offer.options||[]).includes('international')) continue;
+      if (sub.needRoaming && !(offer.options||[]).includes('roaming')) continue;
+    }
+    if (offer.type === 'internet') {
+      if (sub.needDebit && parseInt(offer.debit||0) < parseInt(sub.needDebit||0)) continue;
+      if (sub.needConnexion && offer.connexion !== sub.needConnexion) continue;
+      if (sub.needTv && !offer.tvIncluse) continue;
+    }
+    if (offer.type === 'streaming') {
+      const qualOrder = ['','SD','HD','Full HD','4K'];
+      if (sub.needQualite && qualOrder.indexOf(offer.qualite||'') < qualOrder.indexOf(sub.needQualite)) continue;
+      if (sub.needEcrans && parseInt(offer.ecrans||1) < parseInt(sub.needEcrans||1)) continue;
+    }
+    if (offer.type === 'assurance') {
+      const assurOrder = ['','Casse','Vol','Casse + Vol','Tous risques'];
+      if (sub.needAssurType && assurOrder.indexOf(offer.assurType||'') < assurOrder.indexOf(sub.needAssurType)) continue;
+    }
+    return 1; // Match found
+  }
+  return 0;
+}
+
+// ---- MATCH LOGIC (best overall offer per client) ----
+function renderClients() {
+  const grid = document.getElementById('client-grid');
+  let filtered = clients.filter(c => {
+    if (currentSearch) {
+      const q = currentSearch;
+      if (!c.firstname.toLowerCase().includes(q) &&
+          !c.lastname.toLowerCase().includes(q) &&
+          !(c.phone||'').includes(q) &&
+          !(c.id||'').toLowerCase().includes(q)) return false;
+    }
+    // Filter by selected offer from right sidebar
+    if (selectedOfferFilter) {
+      const offer = offers.find(o => o.id === selectedOfferFilter);
+      if (!offer || matchScore(c, offer) === 0) return false;
+    }
+    if (currentFilter === 'all') return true;
+    const m = getClientMatch(c);
+    if (currentFilter === 'green') return m.status === 'green';
+    if (currentFilter === 'red') return m.status === 'red';
+    if (currentFilter === 'none') return m.status === 'none';
+    return true;
+  });
+
+  // STATS
+  const totalBudget = clients.reduce((s, c) => s + c.subscriptions.reduce((ss, sub) => ss + parseFloat(sub.price || 0), 0), 0);
+  const matched = clients.filter(c => getClientMatch(c).status === 'green').length;
+  const totalSavings = clients.reduce((s, c) => { const m = getClientMatch(c); return s + (m.status === 'green' ? m.savings : 0); }, 0);
+
+  document.getElementById('stat-total').textContent = clients.length;
+  document.getElementById('stat-budget').textContent = totalBudget.toFixed(2) + ' €';
+  document.getElementById('stat-matched').textContent = matched;
+  document.getElementById('stat-savings').textContent = totalSavings.toFixed(2) + ' €';
+  document.getElementById('clients-count-badge').textContent = clients.length;
+
+  // Offer filter banner
+  const existingBanner = document.getElementById('offer-filter-banner');
+  if (existingBanner) existingBanner.remove();
+  if (selectedOfferFilter) {
+    const offer = offers.find(o => o.id === selectedOfferFilter);
+    if (offer) {
+      const banner = document.createElement('div');
+      banner.id = 'offer-filter-banner';
+      banner.style.cssText = 'margin-bottom:16px;padding:10px 16px;background:rgba(0,112,243,0.1);border:1px solid rgba(0,112,243,0.3);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;';
+      banner.innerHTML = `<span style="font-size:13px;color:var(--accent2);">🎯 Filtre actif : <strong>${offer.name}</strong>${offer.operator ? ' — ' + offer.operator : ''} — <strong>${filtered.length} client${filtered.length > 1 ? 's' : ''} compatible${filtered.length > 1 ? 's' : ''}</strong></span>
+        <button onclick="selectOfferFilter(null)" style="background:none;border:1px solid rgba(0,112,243,0.4);color:var(--accent2);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px;">✕ Effacer</button>`;
+      grid.parentElement.insertBefore(banner, grid);
+    }
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👤</div><div class="empty-title">Aucun client</div><div class="empty-sub">${clients.length === 0 ? 'Cliquez sur "+ Client" pour commencer' : 'Aucun résultat pour cette recherche'}</div></div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map((c, i) => {
+    const total = c.subscriptions.reduce((s, sub) => s + parseFloat(sub.price || 0), 0);
+    const match = getClientMatch(c);
+    const badgeHtml = match.status === 'green'
+      ? `<span class="match-badge green" style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+           <span>✅ Offre trouvée</span>
+           <span style="font-size:10px;opacity:0.8;">${match.offer.name||''} −${match.savings.toFixed(0)}€/mois</span>
+         </span>`
+      : match.status === 'red' ? `<span class="match-badge red">❌ Pas d'offre</span>`
+      : `<span class="match-badge none">— À analyser</span>`;
+
+    const subsHtml = c.subscriptions.slice(0, 4).map(s => {
+      const isMatched = match.status === 'green' && match.offer && s.type === match.offer.type && parseFloat(s.price||0) > parseFloat(match.offer.price||0);
+      return isMatched
+        ? `<span class="sub-tag" style="background:rgba(0,229,160,0.15);border-color:rgba(0,229,160,0.5);color:var(--green);font-weight:700;">✅ ${s.name||s.type}</span>`
+        : `<span class="sub-tag">${s.name||s.type}</span>`;
+    }).join('') + (c.subscriptions.length > 4 ? `<span class="sub-tag">+${c.subscriptions.length-4}</span>` : '');
+
+    const savings = match.status === 'green' ? `<span style="font-size:11px;color:var(--green);font-family:'DM Mono',monospace;">−${match.savings.toFixed(0)}€/mois</span>` : '';
+
+    const urgency = getClientUrgency(c);
+    const urgencyClass = urgency === 'urgent' ? ' urgent' : urgency === 'soon' ? ' soon' : '';
+
+    // Find soonest expiring sub
+    let soonestSub = null, soonestDays = Infinity;
+    (c.subscriptions || []).forEach(s => {
+      if (s.endDate) {
+        const d = daysUntil(s.endDate);
+        if (d !== null && d >= 0 && d < soonestDays) { soonestDays = d; soonestSub = s; }
+      }
+    });
+    const expiryHtml = soonestSub ? `
+      <div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:5px 8px;border-radius:7px;background:${urgency==='urgent'?'rgba(255,71,87,0.12)':urgency==='soon'?'rgba(255,159,67,0.1)':'rgba(255,255,255,0.04)'};border:1px solid ${urgency==='urgent'?'rgba(255,71,87,0.3)':urgency==='soon'?'rgba(255,159,67,0.3)':'var(--border)'}">
+        <span style="font-size:11px;">⏰</span>
+        <span style="font-size:11px;color:${urgency==='urgent'?'var(--red)':urgency==='soon'?'var(--orange)':'var(--text3)'};font-family:'DM Mono',monospace;">${soonestSub.name||'Abonnement'} — ${soonestDays}j</span>
+      </div>` : '';
+
+    return `<div class="client-card match-${match.status}${urgencyClass}" style="animation-delay:${i*0.04}s" onclick="openDetail('${c.id}')" oncontextmenu="event.preventDefault();confirmDeleteClient('${c.id}')" ontouchstart="startLongPress(event,'${c.id}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()">
+      <div class="client-header">
+        <div>
+          <div class="client-id">${c.id}</div>
+          <div class="client-name">${c.firstname} ${c.lastname}</div>
+          <div class="client-phone">${c.phone || '—'}</div>
+        </div>
+        <div>${badgeHtml}</div>
+      </div>
+      <div class="client-subs">${subsHtml || '<span style="font-size:12px;color:var(--text3)">Aucun abonnement</span>'}</div>
+      ${expiryHtml}
+      <div class="client-total">
+        <div>
+          <div class="total-label">Budget mensuel</div>
+          ${savings}
+        </div>
+        <div class="total-amount">${total.toFixed(2)} €</div>
+      </div>
+    </div>`;
+  }).join('');
+  updateEchBadge();
+}
+
+// ---- RENDER OFFERS ----
+function renderOffers() {
+  document.getElementById('offers-count-badge').textContent = offers.length;
+  const el = document.getElementById('offers-list');
+  if (offers.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">Aucune offre enregistrée</div><div class="empty-sub">Cliquez sur "+ Nouvelle offre" pour commencer</div></div>`;
+    return;
+  }
+  el.innerHTML = offers.map(o => {
+    const opts = (o.options||[]).map(op => {
+      const labels = {international:'🌍 Intl',roaming:'✈️ EU',5:'📶 5G',fixe:'🏠 Fixe',multi:'👨‍👩‍👧 Multi',illimite:'♾️ Illim.'};
+      return `<span class="need-tag active">${labels[op]||op}</span>`;
+    }).join('');
+    return `<div class="offer-card">
+      <div class="offer-header">
+        <div>
+          <div class="offer-name">${o.name}</div>
+          <div class="offer-operator">${o.operator}${o.type ? ` · <span style="font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 7px;">${{mobile:'📱 Mobile',internet:'🌐 Internet',streaming:'🎬 Streaming',musique:'🎵 Musique',assurance:'🛡️ Assurance',autre:'📦 Autre'}[o.type]||o.type}</span>` : ''}</div>
+        </div>
+        <div>
+          <div class="offer-price">${parseFloat(o.price).toFixed(2)} €<span>/mois</span></div>
+          <button class="btn btn-secondary" style="margin-top:8px;padding:4px 10px;font-size:11px;" onclick="deleteOffer('${o.id}')">🗑 Supprimer</button>
+        </div>
+      </div>
+      <div class="offer-specs">
+        ${o.type === 'mobile' ? `
+          <div class="offer-spec"><div class="spec-val">${o.dataIllimite ? '∞' : (o.data||'—')+' Go'}</div><div class="spec-label">Data</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.calls||'—'}</div><div class="spec-label">Appels</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.sms||'—'}</div><div class="spec-label">SMS</div></div>
+          ${o.engagement ? `<div class="offer-spec"><div class="spec-val">${o.engagement}</div><div class="spec-label">Engagement</div></div>` : ''}
+        ` : o.type === 'internet' ? `
+          <div class="offer-spec"><div class="spec-val">${o.connexion||'—'}</div><div class="spec-label">Connexion</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.debit ? o.debit+' Mb/s' : '—'}</div><div class="spec-label">Débit</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.tvIncluse ? '✅' : '—'}</div><div class="spec-label">TV</div></div>
+          ${o.engagement ? `<div class="offer-spec"><div class="spec-val">${o.engagement}</div><div class="spec-label">Engagement</div></div>` : ''}
+        ` : o.type === 'streaming' ? `
+          <div class="offer-spec"><div class="spec-val">${o.qualite||'—'}</div><div class="spec-label">Qualité</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.ecrans||'—'}</div><div class="spec-label">Écrans</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.profils||'—'}</div><div class="spec-label">Profils</div></div>
+        ` : o.type === 'musique' ? `
+          <div class="offer-spec"><div class="spec-val">${o.musicComptes||'1'}</div><div class="spec-label">Comptes</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.musicQualite||'—'}</div><div class="spec-label">Qualité</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.musicOffline ? '✅' : '—'}</div><div class="spec-label">Offline</div></div>
+        ` : o.type === 'assurance' ? `
+          <div class="offer-spec"><div class="spec-val">${{tech:'📱 High-Tech',auto:'🚗 Auto',habitation:'🏠 Habitation'}[o.assurSub]||'🛡️'}</div><div class="spec-label">Catégorie</div></div>
+          <div class="offer-spec"><div class="spec-val">${o.assurFranchise ? o.assurFranchise+'€' : '—'}</div><div class="spec-label">Franchise</div></div>
+          ${o.assurSub === 'tech' ? `<div class="offer-spec"><div class="spec-val">${o.assurType||'—'}</div><div class="spec-label">Couverture</div></div><div class="offer-spec"><div class="spec-val">${Array.isArray(o.assurAppareils)?o.assurAppareils.length:'—'}</div><div class="spec-label">Appareils</div></div>` : ''}
+          ${o.assurSub === 'auto' ? `<div class="offer-spec"><div class="spec-val">${o.autoNiveau||'—'}</div><div class="spec-label">Niveau</div></div><div class="offer-spec"><div class="spec-val">${o.autoVehicule||'—'}</div><div class="spec-label">Véhicule</div></div>` : ''}
+          ${o.assurSub === 'habitation' ? `<div class="offer-spec"><div class="spec-val">${o.habType||'—'}</div><div class="spec-label">Logement</div></div><div class="offer-spec"><div class="spec-val">${o.habStatut||'—'}</div><div class="spec-label">Statut</div></div>` : ''}
+          ${Array.isArray(o.assurAppareils) && o.assurAppareils.length ? `</div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${o.assurAppareils.map(a => `<span style="background:rgba(255,159,67,0.1);border:1px solid rgba(255,159,67,0.3);border-radius:6px;padding:3px 10px;font-size:12px;color:var(--orange);">${a.nom}${a.remboursement?' · '+a.remboursement:''}${a.montant?' · '+a.montant:''}${a.plafond?' · plafond '+a.plafond+'€':''}</span>`).join('')}` : ''}
+        ` : `
+          <div class="offer-spec"><div class="spec-val" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${o.autreDesc||'—'}</div><div class="spec-label">Description</div></div>
+        `}
+      </div>
+      <div>${opts}</div>
+      ${o.notes ? `<div style="font-size:12px;color:var(--text3);margin-top:10px;font-style:italic;">${o.notes}</div>` : ''}
+      ${o.fraisOfferts ? `<div style="margin-top:8px;"><span style="background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);border-radius:6px;padding:3px 10px;font-size:12px;color:var(--accent);font-weight:600;">✅ Frais de mise en service offerts</span></div>` : o.frais ? `<div style="margin-top:8px;"><span style="background:rgba(255,159,67,0.1);border:1px solid rgba(255,159,67,0.3);border-radius:6px;padding:3px 10px;font-size:12px;color:var(--orange);font-weight:600;">⚠️ Frais de mise en service : ${o.frais}€</span></div>` : ''}
+    </div>`;
+  }).join('');
+  renderOffersSidebar();
+}
+
+// ---- RENDER MATCHING ----
+function renderMatching() {
+  const el = document.getElementById('matching-content');
+  if (clients.length === 0 || offers.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">⚡</div><div class="empty-title">Ajoutez des clients et des offres</div><div class="empty-sub">Le matching s'affichera automatiquement ici</div></div>`;
+    return;
+  }
+
+  el.innerHTML = offers.map(o => {
+    const typeLabels = {mobile:'📱',internet:'🌐',streaming:'🎬',musique:'🎵',assurance:'🛡️',autre:'📦'};
+    const matches = clients.map(c => {
+      const score = matchScore(c, o);
+      const matchingSub = (c.subscriptions||[]).find(s => s.type === o.type);
+      const savings = matchingSub ? parseFloat(matchingSub.price||0) - parseFloat(o.price||0) : 0;
+      const reasons = [];
+      if (!matchingSub) reasons.push('pas d\'abonnement ' + (o.type||'') + ' dans la fiche');
+      else if (parseFloat(o.price) >= parseFloat(matchingSub.price||0)) reasons.push('pas d\'économie (offre plus chère)');
+      else if (score === 0) reasons.push('besoins non couverts');
+      return { client: c, ok: score > 0 && savings > 0, savings, reasons };
+    });
+
+    const greens = matches.filter(m => m.ok);
+    const reds = matches.filter(m => !m.ok);
+
+    return `<div class="offer-card" style="margin-bottom:16px;">
+      <div class="offer-header" style="margin-bottom:0">
+        <div>
+          <div class="offer-name">${typeLabels[o.type]||'📦'} ${o.name} — ${o.operator||''}</div>
+          <div class="offer-operator">${parseFloat(o.price).toFixed(2)}€/mois</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <span style="background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);color:var(--green);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">${greens.length} ✅</span>
+          <span style="background:rgba(255,71,87,0.1);border:1px solid rgba(255,71,87,0.3);color:var(--red);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">${reds.length} ❌</span>
+        </div>
+      </div>
+      <div class="match-results" style="margin-top:16px;">
+        ${greens.length > 0 ? `<div class="match-title">Clients compatibles</div>
+        <div class="match-list">${greens.map(m => `<div class="match-row ok">
+          <span class="match-client">${m.client.firstname} ${m.client.lastname} <span class="client-id" style="margin-left:6px">${m.client.id}</span></span>
+          <span class="match-savings ok">−${m.savings.toFixed(2)} €/mois</span>
+        </div>`).join('')}</div>` : ''}
+        ${reds.length > 0 ? `<div class="match-title" style="margin-top:12px">Clients non compatibles</div>
+        <div class="match-list">${reds.map(m => `<div class="match-row ko">
+          <span class="match-client">${m.client.firstname} ${m.client.lastname}</span>
+          <span class="match-savings ko">${m.reasons[0]||'non compatible'}</span>
+        </div>`).join('')}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- CLIENT DETAIL ----
+function openDetail(id) {
+  const c = clients.find(x => x.id === id);
+  if (!c) return;
+  currentDetailClientId = id;
+  const total = c.subscriptions.reduce((s, sub) => s + parseFloat(sub.price || 0), 0);
+  const match = getClientMatch(c);
+
+  const typeInfo = {
+    mobile:    { icon: '📱', color: '#0070f3', bg: 'rgba(0,112,243,0.1)' },
+    internet:  { icon: '🌐', color: '#00e5a0', bg: 'rgba(0,229,160,0.1)' },
+    streaming: { icon: '🎬', color: '#e50914', bg: 'rgba(229,9,20,0.1)' },
+    musique:   { icon: '🎵', color: '#1db954', bg: 'rgba(29,185,84,0.1)' },
+    assurance: { icon: '🛡️', color: '#ff9f43', bg: 'rgba(255,159,67,0.1)' },
+    autre:     { icon: '📦', color: '#7a8ba8', bg: 'rgba(122,139,168,0.1)' },
+  };
+
+  const matchBlock = match.status === 'green' ? `
+    <div style="background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:12px;padding:14px;margin-bottom:20px;">
+      <div style="font-size:12px;color:var(--green);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">✅ Offre recommandée</div>
+      <div style="font-size:15px;font-weight:600;">${match.offer.name} — ${match.offer.operator}</div>
+      <div style="font-size:13px;color:var(--text3);margin-top:2px;">${match.offer.data}Go · ${match.offer.calls} appels · ${parseFloat(match.offer.price).toFixed(2)} €/mois</div>
+      <div style="font-size:18px;font-weight:700;color:var(--green);margin-top:8px;">Économie estimée : −${match.savings.toFixed(2)} €/mois</div>
+    </div>` :
+    match.status === 'red' ? `<div style="background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);border-radius:12px;padding:14px;margin-bottom:20px;color:var(--red);font-size:13px;font-weight:600;">❌ Aucune offre compatible trouvée pour ce client</div>` :
+    `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:20px;color:var(--text3);font-size:13px;">— Aucune offre à comparer pour l'instant</div>`;
+
+  const subsHtml = c.subscriptions.length > 0 ? c.subscriptions.map(s => {
+    const t = typeInfo[s.type] || typeInfo.autre;
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:7px;background:${t.bg};display:flex;align-items:center;justify-content:center;font-size:14px;">${t.icon}</div>
+          <div>
+            <div style="font-weight:700;font-size:14px;">${s.name||'—'}</div>
+            <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${s.type ? s.type.toUpperCase() : '—'}</div>
+          </div>
+        </div>
+        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--orange);">${parseFloat(s.price||0).toFixed(2)} €<span style="font-size:10px;color:var(--text3);font-family:'Instrument Sans',sans-serif;font-weight:400;">/mois</span></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px;">
+        ${s.operator ? `<span style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text2);">🏢 ${s.operator}</span>` : ''}
+        ${s.user ? `<span style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text2);">👤 ${s.user}</span>` : ''}
+        ${s.phone && (s.type==='mobile'||s.type==='internet') ? `<span style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text2);">📞 ${s.phone}</span>` : ''}
+        ${s.type === 'mobile' ? `
+          ${s.dataIllimite ? `<span style="background:rgba(0,112,243,0.1);border:1px solid rgba(0,112,243,0.3);border-radius:5px;padding:2px 8px;color:var(--accent2);">📶 Data illimitée</span>` : s.dataGo ? `<span style="background:rgba(0,112,243,0.1);border:1px solid rgba(0,112,243,0.3);border-radius:5px;padding:2px 8px;color:var(--accent2);">📶 ${s.dataGo} Go</span>` : ''}
+          ${s.callsIllimite ? `<span style="background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);border-radius:5px;padding:2px 8px;color:var(--green);">📞 Appels illimités</span>` : ''}
+          ${s.smsIllimite ? `<span style="background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);border-radius:5px;padding:2px 8px;color:var(--green);">💬 SMS illimités</span>` : ''}
+          ${s.rio ? `<span style="background:rgba(255,159,67,0.1);border:1px solid rgba(255,159,67,0.3);border-radius:5px;padding:2px 8px;color:var(--orange);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">RIO : ${s.rio}</span>` : ''}
+        ` : ''}
+        ${s.type === 'internet' ? `
+          ${s.connexion ? `<span style="background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);border-radius:5px;padding:2px 8px;color:var(--green);">🔌 ${s.connexion}</span>` : ''}
+          ${s.debit ? `<span style="background:rgba(0,112,243,0.1);border:1px solid rgba(0,112,243,0.3);border-radius:5px;padding:2px 8px;color:var(--accent2);">⚡ ${s.debit} Mb/s</span>` : ''}
+          ${s.tvIncluse ? `<span style="background:rgba(255,159,67,0.1);border:1px solid rgba(255,159,67,0.3);border-radius:5px;padding:2px 8px;color:var(--orange);">📺 TV incluse${s.tvPrice ? ' — ' + s.tvPrice + '€' : ''}</span>` : '<span style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text3);">📺 Sans TV</span>'}
+        ` : ''}
+        ${s.options ? `<span style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text2);">⚙️ ${s.options}</span>` : ''}
+        ${s.endDate ? (() => { const d = daysUntil(s.endDate); const dateF = new Date(s.endDate).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}); const col = d <= 14 ? 'var(--red)' : d <= 30 ? 'var(--orange)' : 'var(--text3)'; return `<span style="background:var(--bg);border:1px solid ${d<=14?'rgba(255,71,87,0.4)':d<=30?'rgba(255,159,67,0.3)':'var(--border)'};border-radius:5px;padding:2px 8px;color:${col};">⏰ Fin le ${dateF} (${d}j)</span>`; })() : s.noEndDate ? `<span style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--accent);">✅ Sans engagement</span>` : ''}
+      </div>
+    </div>`;
+  }).join('') : '<div style="color:var(--text3);font-size:13px;">Aucun abonnement enregistré</div>';
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-header">
+      <div class="detail-avatar">${initials}</div>
+      <div class="detail-info">
+        <div class="detail-name">${c.firstname} ${c.lastname}</div>
+        <div class="detail-meta" style="margin-top:4px;">
+          ${c.phone ? `📞 ${c.phone}` : ''} ${c.phone && c.email ? '·' : ''} ${c.email ? `✉️ ${c.email}` : ''}
+        </div>
+        ${c.address ? `<div style="font-size:12px;color:var(--text3);margin-top:4px;">📍 ${c.address}</div>` : ''}
+        ${c.address ? (() => {
+          const addr = encodeURIComponent(c.address);
+          return `<div style="margin-top:10px;">
+            <a href="https://www.monreseaumobile.fr/?address=${addr}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);color:var(--accent);font-size:13px;font-weight:700;text-decoration:none;">🗺️ Comparer réseau</a>
+          </div>`;
+        })() : '<div style="font-size:12px;color:var(--text3);margin-top:8px;font-style:italic;">Ajoutez une adresse pour vérifier la couverture réseau</div>'}
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">Budget mensuel</div>
+        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--orange);">${total.toFixed(2)} €</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;">${c.subscriptions.length} abonnement${c.subscriptions.length > 1 ? 's' : ''}</div>
+      </div>
+    </div>
+    ${matchBlock}
+    <div style="margin-bottom:20px;">
+      <div class="detail-block-title" style="margin-bottom:12px;">📦 Abonnements du foyer</div>
+      ${subsHtml}
+    </div>
+  `;
+  openModal('modal-detail');
+}
+
+function editCurrentClient() {
+  closeModal('modal-detail');
+  const c = clients.find(x => x.id === currentDetailClientId);
+  if (!c) return;
+  editingClientId = c.id;
+  document.getElementById('modal-client-title').textContent = '✏️ Modifier le client';
+  document.getElementById('c-firstname').value = c.firstname;
+  document.getElementById('c-lastname').value = c.lastname;
+  document.getElementById('c-phone').value = c.phone || '';
+  document.getElementById('c-email').value = c.email || '';
+  document.getElementById('c-address').value = c.address || '';
+
+  // subs
+  const container = document.getElementById('subs-container');
+  container.innerHTML = '';
+  (c.subscriptions || []).forEach(s => addSubRow(s));
+
+  // needs
+  openModal('modal-client');
+}
+
+// ---- MODAL ----
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openAddClient() {
+  editingClientId = null;
+  document.getElementById('modal-client-title').textContent = '➕ Nouveau client';
+  document.getElementById('c-firstname').value = '';
+  document.getElementById('c-lastname').value = '';
+  document.getElementById('c-phone').value = '';
+  document.getElementById('c-email').value = '';
+  document.getElementById('c-address').value = '';
+  document.getElementById('subs-container').innerHTML = '';
+  addSubRow();
+  openModal('modal-client');
+}
+
+function openAddOffer() {
+  document.getElementById('o-name').value = '';
+  document.getElementById('o-price').value = '';
+  document.getElementById('o-notes').value = '';
+  document.getElementById('o-frais').value = '';
+  document.getElementById('o-frais-offerts').checked = false;
+  toggleFrais(document.getElementById('o-frais-offerts'));
+  // Hide all type sections
+  ['mobile','internet','streaming','musique','assurance','autre'].forEach(t => {
+    document.getElementById(`o-fields-${t}`).style.display = 'none';
+  });
+  document.querySelectorAll('#offer-type-btns .sub-type-btn').forEach(b => b.classList.remove('selected'));
+  // Reset mobile fields
+  document.getElementById('o-data').value = '';
+  document.getElementById('o-data-illimite').checked = false;
+  document.querySelectorAll('#offer-options .checkbox-item').forEach(el => el.classList.remove('checked'));
+  // Reset internet fields
+  document.getElementById('o-debit').value = '';
+  document.getElementById('o-connexion').value = '';
+  document.getElementById('o-tv').checked = false;
+  document.getElementById('o-tv-price-wrap').style.display = 'none';
+  document.getElementById('o-tv-price').value = '';
+  // Reset streaming
+  document.getElementById('o-qualite').value = '';
+  document.getElementById('o-ecrans').value = '1';
+  document.getElementById('o-profils').value = '';
+  document.getElementById('o-stream-download').checked = false;
+  document.getElementById('o-stream-famille').checked = false;
+  // Reset musique
+  document.getElementById('o-music-offline').checked = false;
+  document.getElementById('o-music-comptes').value = '';
+  document.getElementById('o-music-qualite').value = '';
+  // Reset assurance
+  document.getElementById('o-assur-franchise').value = '';
+  document.getElementById('o-assur-carence').value = '';
+  document.getElementById('o-assur-appareils-list').innerHTML = '';
+  document.getElementById('o-assur-appareil-select').value = '';
+  document.getElementById('o-assur-type').value = '';
+  document.querySelectorAll('#assur-sub-btns .sub-type-btn').forEach(b => b.classList.remove('selected'));
+  ['o-assur-tech','o-assur-auto','o-assur-habitation'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['o-auto-niveau','o-auto-vehicule','o-auto-remboursement','o-hab-type','o-hab-statut'].forEach(id => document.getElementById(id).value = '');
+  ['o-auto-valeur','o-auto-valeur','o-hab-capital','o-hab-surface'].forEach(id => document.getElementById(id).value = '');
+  ['o-auto-protection-juridique','o-auto-assistance','o-auto-conducteur','o-auto-pret-vehicule','o-hab-dommages','o-hab-bris-glace','o-hab-vol','o-hab-pj','o-hab-jardin'].forEach(id => document.getElementById(id).checked = false);
+  // Reset autre
+  document.getElementById('o-autre-desc').value = '';
+  buildOperatorSelect();
+  document.getElementById('new-operator-wrap').style.display = 'none';
+  document.getElementById('o-operator-new').value = '';
+  openModal('modal-offer');
+}
+
+// ---- SUBS ----
+const SUB_TYPES = [
+  { key: 'mobile',    label: '📱 Mobile',    icon: '📱', color: '#0070f3' },
+  { key: 'internet',  label: '🌐 Internet',  icon: '🌐', color: '#00e5a0' },
+  { key: 'streaming', label: '🎬 Streaming', icon: '🎬', color: '#e50914' },
+  { key: 'musique',   label: '🎵 Musique',   icon: '🎵', color: '#1db954' },
+  { key: 'assurance', label: '🛡️ Assurance', icon: '🛡️', color: '#ff9f43' },
+  { key: 'autre',     label: '📦 Autre',     icon: '📦', color: '#7a8ba8' },
+];
+
+function buildDayOptions(sel) {
+  let o = '<option value="">Jour</option>';
+  for (let d = 1; d <= 31; d++) o += `<option value="${d}"${sel==d?' selected':''}>${String(d).padStart(2,'0')}</option>`;
+  return o;
+}
+function buildMonthOptions(sel) {
+  const months = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  let o = '<option value="">Mois</option>';
+  months.forEach((m,i) => o += `<option value="${i+1}"${sel==i+1?' selected':''}>${m}</option>`);
+  return o;
+}
+function buildYearOptions(sel) {
+  const now = new Date().getFullYear();
+  let o = '<option value="">Année</option>';
+  for (let y = now; y <= now + 5; y++) o += `<option value="${y}"${sel==y?' selected':''}>${y}</option>`;
+  return o;
+}
+
+function addSubRow(sub = {}) {
+  const container = document.getElementById('subs-container');
+  const card = document.createElement('div');
+  card.className = 'sub-card';
+  const typeSelected = sub.type || '';
+
+  // Parse existing end date
+  let eDay = '', eMonth = '', eYear = '';
+  if (sub.endDate) {
+    const parts = sub.endDate.split('-');
+    if (parts.length === 3) { eYear = parts[0]; eMonth = parseInt(parts[1]); eDay = parseInt(parts[2]); }
+  }
+
+  const typeButtons = SUB_TYPES.map(t =>
+    `<button type="button" class="sub-type-btn${typeSelected === t.key ? ' selected' : ''}" data-type="${t.key}" onclick="selectSubType(this)">${t.label}</button>`
+  ).join('');
+
+  card.innerHTML = `
+    <button type="button" class="sub-remove" onclick="this.closest('.sub-card').remove()">−</button>
+    <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Type d'abonnement</div>
+    <div class="sub-type-select">${typeButtons}</div>
+
+    <!-- CHAMPS COMMUNS -->
+    <div class="sub-card-grid">
+      <div class="form-group">
+        <label class="form-label">Nom / Libellé</label>
+        <input class="form-input sub-field sub-name" placeholder="ex: Orange Mobile, Freebox..." value="${sub.name||''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Opérateur</label>
+        <select class="form-select sub-operator" onchange="checkNewSubOperator(this)">
+          <option value="">— Choisir —</option>
+          ${getOperators().map(op => `<option value="${op}"${sub.operator===op?' selected':''}>${op}</option>`).join('')}
+          <option value="__new__">＋ Ajouter un opérateur...</option>
+        </select>
+        <div class="sub-new-op-wrap" style="display:none;margin-top:6px;">
+          <div style="display:flex;gap:6px;">
+            <input class="form-input sub-new-op-input" placeholder="Nom du nouvel opérateur..." style="flex:1;">
+            <button type="button" class="btn btn-secondary" onclick="addNewSubOperator(this)" style="white-space:nowrap;font-size:12px;">+ Ajouter</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Utilisateur</label>
+        <select class="form-select sub-user" onchange="checkNewSubUser(this)">
+          <option value="">— Choisir —</option>
+          ${getUsers().map(u => `<option value="${u}"${sub.user===u?' selected':''}>${u}</option>`).join('')}
+          <option value="__new__">＋ Ajouter un utilisateur...</option>
+        </select>
+        <div class="sub-new-user-wrap" style="display:none;margin-top:6px;">
+          <div style="display:flex;gap:6px;">
+            <input class="form-input sub-new-user-input" placeholder="ex: Marie, Jean, Foyer..." style="flex:1;">
+            <button type="button" class="btn btn-secondary" onclick="addNewSubUser(this)" style="white-space:nowrap;font-size:12px;">+ Ajouter</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAMPS MOBILE -->
+    <div class="sub-mobile-fields" style="display:${typeSelected==='mobile'?'block':'none'}">
+      <div style="font-size:11px;color:var(--accent2);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin:10px 0 8px;">📱 Abonnement actuel</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div class="form-group">
+          <label class="form-label">Data actuelle</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input class="form-input sub-data-go" type="number" placeholder="Go" value="${sub.dataGo||''}" style="flex:1;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);white-space:nowrap;">
+              <input type="checkbox" class="sub-data-illimite" onchange="toggleDataGo(this)" ${sub.dataIllimite?'checked':''} style="accent-color:var(--accent2);">
+              Illimitée
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Appels actuels</label>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--text2);">
+            <input type="checkbox" class="sub-calls-illimite" ${sub.callsIllimite?'checked':''} style="accent-color:var(--accent2);width:14px;height:14px;">
+            Illimités
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SMS actuels</label>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--text2);">
+            <input type="checkbox" class="sub-sms-illimite" ${sub.smsIllimite?'checked':''} style="accent-color:var(--accent2);width:14px;height:14px;">
+            Illimités
+          </label>
+        </div>
+      </div>
+
+      <div style="border-top:1px dashed var(--border);margin:12px 0 10px;"></div>
+      <div style="font-size:11px;color:var(--orange);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">🎯 Besoins minimum acceptables</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div class="form-group">
+          <label class="form-label">Data minimum</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input class="form-input sub-need-data-go" type="number" placeholder="Go" value="${sub.needDataGo||''}" style="flex:1;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);white-space:nowrap;">
+              <input type="checkbox" class="sub-need-data-illimite" ${sub.needDataIllimite?'checked':''} style="accent-color:var(--orange);">
+              Illimitée
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Appels min</label>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--text2);">
+            <input type="checkbox" class="sub-need-calls" ${sub.needCalls?'checked':''} style="accent-color:var(--orange);width:14px;height:14px;">
+            Illimités requis
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SMS min</label>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--text2);">
+            <input type="checkbox" class="sub-need-sms" ${sub.needSms?'checked':''} style="accent-color:var(--orange);width:14px;height:14px;">
+            Illimités requis
+          </label>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label class="form-label" style="margin-bottom:6px;display:block;">Options requises</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 8px;">
+            <input type="checkbox" class="sub-need-5g" ${sub.need5g?'checked':''} style="accent-color:var(--orange);width:13px;height:13px;"> 📶 5G
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 8px;">
+            <input type="checkbox" class="sub-need-international" ${sub.needInternational?'checked':''} style="accent-color:var(--orange);width:13px;height:13px;"> 🌍 International
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 8px;">
+            <input type="checkbox" class="sub-need-roaming" ${sub.needRoaming?'checked':''} style="accent-color:var(--orange);width:13px;height:13px;"> ✈️ Roaming EU
+          </label>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:8px;max-width:260px;">
+        <label class="form-label">Numéro de téléphone</label>
+        <input class="form-input sub-phone" placeholder="ex: 06 12 34 56 78" value="${sub.phone||''}" type="tel">
+      </div>
+      <div class="form-group" style="margin-top:8px;max-width:260px;">
+        <label class="form-label">Code RIO</label>
+        <input class="form-input sub-rio" placeholder="ex: 00AB1234567" value="${sub.rio||''}" style="font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+      </div>
+    </div>
+
+    <!-- CHAMPS INTERNET -->
+    <div class="sub-internet-fields" style="display:${typeSelected==='internet'?'block':'none'}">
+      <div style="font-size:11px;color:var(--accent);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin:10px 0 8px;">🌐 Abonnement actuel</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div class="form-group">
+          <label class="form-label">Débit actuel (Mb/s)</label>
+          <input class="form-input sub-debit" type="number" placeholder="ex: 500" value="${sub.debit||''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type de connexion actuel</label>
+          <select class="form-select sub-connexion" onchange="checkNewSubConnexion(this)">
+            <option value="">— Choisir —</option>
+            ${getConnexions().map(c => `<option value="${c}"${sub.connexion===c?' selected':''}>${c}</option>`).join('')}
+            <option value="__new__">＋ Ajouter un type...</option>
+          </select>
+          <div class="sub-new-cx-wrap" style="display:none;margin-top:6px;">
+            <div style="display:flex;gap:6px;">
+              <input class="form-input sub-new-cx-input" placeholder="ex: Satellite, THD..." style="flex:1;">
+              <button type="button" class="btn btn-secondary" onclick="addNewSubConnexion(this)" style="white-space:nowrap;font-size:12px;">+ Ajouter</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label class="form-label" style="margin-bottom:8px;display:block;">TV incluse ?</label>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;">
+            <input type="checkbox" class="sub-tv-incluse" onchange="toggleTvPrice(this)" ${sub.tvIncluse?'checked':''} style="accent-color:var(--accent2);width:14px;height:14px;">
+            Oui, TV incluse
+          </label>
+          <div class="sub-tv-price-wrap" style="display:flex;align-items:center;gap:6px;${sub.tvIncluse?'':'opacity:0.3;pointer-events:none;'}">
+            <span style="font-size:12px;color:var(--text3);">Prix TV :</span>
+            <input class="form-input sub-tv-price" type="number" placeholder="€/mois" value="${sub.tvPrice||''}" style="width:90px;padding:6px 10px;">
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px dashed var(--border);margin:12px 0 10px;"></div>
+      <div style="font-size:11px;color:var(--orange);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">🎯 Besoins minimum acceptables</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div class="form-group">
+          <label class="form-label">Débit minimum (Mb/s)</label>
+          <input class="form-input sub-need-debit" type="number" placeholder="ex: 100" value="${sub.needDebit||''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type requis</label>
+          <select class="form-select sub-need-connexion">
+            <option value="">Indifférent</option>
+            <option value="Fibre" ${sub.needConnexion==='Fibre'?'selected':''}>Fibre obligatoire</option>
+            <option value="ADSL" ${sub.needConnexion==='ADSL'?'selected':''}>ADSL minimum</option>
+            <option value="4G Box" ${sub.needConnexion==='4G Box'?'selected':''}>4G Box minimum</option>
+          </select>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;margin-top:6px;">
+        <input type="checkbox" class="sub-need-tv" ${sub.needTv?'checked':''} style="accent-color:var(--orange);width:14px;height:14px;"> 📺 TV requise
+      </label>
+      <div class="form-group" style="margin-top:10px;max-width:260px;">
+        <label class="form-label">Numéro de ligne / account</label>
+        <input class="form-input sub-phone" placeholder="ex: 09 12 34 56 78" value="${sub.phone||''}" type="tel">
+      </div>
+    </div>
+
+    <!-- CHAMPS STREAMING -->
+    <div class="sub-streaming-fields" style="display:${typeSelected==='streaming'?'block':'none'}">
+      <div class="sub-card-grid-2" style="margin-top:8px;">
+        <div class="form-group">
+          <label class="form-label">Options / Détails</label>
+          <input class="form-input sub-field sub-options" placeholder="ex: Netflix, Disney+..." value="${sub.options||''}">
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label class="form-label" style="margin-bottom:6px;display:block;">Besoins minimum requis</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Qualité minimum</label>
+            <select class="form-select sub-need-qualite">
+              <option value="">Indifférent</option>
+              <option value="HD" ${sub.needQualite==='HD'?'selected':''}>HD minimum</option>
+              <option value="Full HD" ${sub.needQualite==='Full HD'?'selected':''}>Full HD minimum</option>
+              <option value="4K" ${sub.needQualite==='4K'?'selected':''}>4K obligatoire</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Écrans simultanés min</label>
+            <select class="form-select sub-need-ecrans">
+              <option value="">Indifférent</option>
+              <option value="2" ${sub.needEcrans==='2'?'selected':''}>2 minimum</option>
+              <option value="3" ${sub.needEcrans==='3'?'selected':''}>3 minimum</option>
+              <option value="4" ${sub.needEcrans==='4'?'selected':''}>4 minimum</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAMPS ASSURANCE (dans fiche client) -->
+    <div class="sub-assurance-fields" style="display:${typeSelected==='assurance'?'block':'none'}">
+      <div class="sub-card-grid-2" style="margin-top:8px;">
+        <div class="form-group">
+          <label class="form-label">Options / Détails</label>
+          <input class="form-input sub-field sub-options" placeholder="ex: tous risques, vol..." value="${sub.options||''}">
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label class="form-label" style="margin-bottom:6px;display:block;">Couverture minimum requise</label>
+        <select class="form-select sub-need-assur-type" style="max-width:280px;">
+          <option value="">Indifférent</option>
+          <option value="Casse" ${sub.needAssurType==='Casse'?'selected':''}>Casse minimum</option>
+          <option value="Vol" ${sub.needAssurType==='Vol'?'selected':''}>Vol minimum</option>
+          <option value="Casse + Vol" ${sub.needAssurType==='Casse + Vol'?'selected':''}>Casse + Vol minimum</option>
+          <option value="Tous risques" ${sub.needAssurType==='Tous risques'?'selected':''}>Tous risques obligatoire</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- CHAMPS AUTRES (musique, autre) -->
+    <div class="sub-other-fields" style="display:${(typeSelected&&typeSelected!=='mobile'&&typeSelected!=='internet'&&typeSelected!=='streaming'&&typeSelected!=='assurance')?'block':'none'}">
+      <div class="sub-card-grid-2" style="margin-top:8px;">
+        <div class="form-group">
+          <label class="form-label">Options / Détails</label>
+          <input class="form-input sub-field sub-options" placeholder="ex: famille, premium..." value="${sub.options||''}">
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+      <div class="form-group">
+        <label class="form-label">Prix mensuel (€)</label>
+        <input class="form-input sub-field sub-price" type="number" placeholder="ex: 19.99" value="${sub.price||''}">
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:8px;">
+      <label class="form-label">📅 Date de fin de contrat</label>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2);">
+          <input type="checkbox" class="sub-no-enddate" onchange="toggleEndDate(this)" ${sub.noEndDate ? 'checked' : ''} style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer;">
+          Pas de date de fin d'engagement
+        </label>
+      </div>
+      <div class="date-selects sub-date-wrap" style="${sub.noEndDate ? 'opacity:0.3;pointer-events:none;' : ''}">
+        <select class="form-select sub-end-day">${buildDayOptions(eDay)}</select>
+        <select class="form-select sub-end-month">${buildMonthOptions(eMonth)}</select>
+        <select class="form-select sub-end-year">${buildYearOptions(eYear)}</select>
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+}
+
+function selectSubType(btn) {
+  const card = btn.closest('.sub-card');
+  card.querySelectorAll('.sub-type-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  const type = btn.dataset.type;
+  card.querySelector('.sub-mobile-fields').style.display = type === 'mobile' ? 'block' : 'none';
+  card.querySelector('.sub-internet-fields').style.display = type === 'internet' ? 'block' : 'none';
+  card.querySelector('.sub-streaming-fields').style.display = type === 'streaming' ? 'block' : 'none';
+  card.querySelector('.sub-assurance-fields').style.display = type === 'assurance' ? 'block' : 'none';
+  card.querySelector('.sub-other-fields').style.display = (type && type !== 'mobile' && type !== 'internet' && type !== 'streaming' && type !== 'assurance') ? 'block' : 'none';
+}
+
+function toggleDataGo(checkbox) {
+  const goInput = checkbox.closest('.form-group').querySelector('.sub-data-go');
+  goInput.style.opacity = checkbox.checked ? '0.3' : '1';
+  goInput.style.pointerEvents = checkbox.checked ? 'none' : 'auto';
+  if (checkbox.checked) goInput.value = '';
+}
+
+function toggleTvPrice(checkbox) {
+  const wrap = checkbox.closest('div').parentElement.querySelector('.sub-tv-price-wrap');
+  wrap.style.opacity = checkbox.checked ? '1' : '0.3';
+  wrap.style.pointerEvents = checkbox.checked ? 'auto' : 'none';
+}
+
+// ---- CHECKBOX ----
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+}
+
+// ---- SAVE CLIENT ----
+function saveClient() {
+  const firstname = document.getElementById('c-firstname').value.trim();
+  const lastname = document.getElementById('c-lastname').value.trim();
+  if (!firstname || !lastname) { alert('Prénom et nom obligatoires'); return; }
+
+  const subCards = document.querySelectorAll('#subs-container .sub-card');
+  const subscriptions = [];
+  subCards.forEach(card => {
+    const typeBtn = card.querySelector('.sub-type-btn.selected');
+    const name = card.querySelector('.sub-name').value.trim();
+    const price = card.querySelector('.sub-price').value.trim();
+    const d = card.querySelector('.sub-end-day').value;
+    const m = card.querySelector('.sub-end-month').value;
+    const y = card.querySelector('.sub-end-year').value;
+    const noEndDate = card.querySelector('.sub-no-enddate').checked;
+    const endDate = (!noEndDate && d && m && y) ? `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}` : '';
+    if (name || price) {
+      const type = typeBtn ? typeBtn.dataset.type : 'autre';
+      const subData = {
+        type, name,
+        operator: (() => { const s = card.querySelector('.sub-operator'); return s.value === '__new__' ? card.querySelector('.sub-new-op-input').value.trim() : s.value; })(),
+        user: (() => { const s = card.querySelector('.sub-user'); return s.value === '__new__' ? card.querySelector('.sub-new-user-input').value.trim() : s.value; })(),
+        price: parseFloat(price) || 0,
+        endDate, noEndDate
+      };
+      // Mobile specific
+      if (type === 'mobile') {
+        subData.dataIllimite = card.querySelector('.sub-data-illimite').checked;
+        subData.dataGo = subData.dataIllimite ? '' : (card.querySelector('.sub-data-go').value || '');
+        subData.callsIllimite = card.querySelector('.sub-calls-illimite').checked;
+        subData.smsIllimite = card.querySelector('.sub-sms-illimite').checked;
+        subData.rio = card.querySelector('.sub-rio').value.trim();
+        // Besoins minimum
+        subData.needDataIllimite = card.querySelector('.sub-need-data-illimite').checked;
+        subData.needDataGo = subData.needDataIllimite ? '' : (card.querySelector('.sub-need-data-go').value || '');
+        subData.needCalls = card.querySelector('.sub-need-calls').checked;
+        subData.needSms = card.querySelector('.sub-need-sms').checked;
+        subData.need5g = card.querySelector('.sub-need-5g').checked;
+        subData.needInternational = card.querySelector('.sub-need-international').checked;
+        subData.needRoaming = card.querySelector('.sub-need-roaming').checked;
+        subData.phone = card.querySelector('.sub-phone') ? card.querySelector('.sub-phone').value.trim() : '';
+      }
+      // Internet specific
+      if (type === 'internet') {
+        subData.debit = card.querySelector('.sub-debit').value || '';
+        subData.connexion = (() => { const s = card.querySelector('.sub-connexion'); return s.value === '__new__' ? card.querySelector('.sub-new-cx-input').value.trim() : s.value; })();
+        subData.tvIncluse = card.querySelector('.sub-tv-incluse').checked;
+        subData.tvPrice = subData.tvIncluse ? (card.querySelector('.sub-tv-price').value || '') : '';
+        subData.needDebit = card.querySelector('.sub-need-debit').value || '';
+        subData.needConnexion = card.querySelector('.sub-need-connexion').value || '';
+        subData.needTv = card.querySelector('.sub-need-tv').checked;
+        subData.phone = card.querySelector('.sub-phone') ? card.querySelector('.sub-phone').value.trim() : '';
+      }
+      // Streaming specific
+      if (type === 'streaming') {
+        subData.options = card.querySelector('.sub-options') ? card.querySelector('.sub-options').value.trim() : '';
+        subData.needQualite = card.querySelector('.sub-need-qualite').value || '';
+        subData.needEcrans = card.querySelector('.sub-need-ecrans').value || '';
+      }
+      // Assurance specific
+      if (type === 'assurance') {
+        subData.options = card.querySelector('.sub-options') ? card.querySelector('.sub-options').value.trim() : '';
+        subData.needAssurType = card.querySelector('.sub-need-assur-type').value || '';
+      }
+      // Other types
+      if (type !== 'mobile' && type !== 'internet' && type !== 'streaming' && type !== 'assurance') {
+        subData.options = card.querySelector('.sub-options') ? card.querySelector('.sub-options').value.trim() : '';
+      }
+      subscriptions.push(subData);
+    }
+  });
+
+  const data = {
+    firstname, lastname,
+    phone: document.getElementById('c-phone').value.trim(),
+    email: document.getElementById('c-email').value.trim(),
+    address: document.getElementById('c-address').value.trim(),
+    subscriptions
+  };
+
+  if (editingClientId) {
+    const idx = clients.findIndex(c => c.id === editingClientId);
+    if (idx >= 0) clients[idx] = { ...clients[idx], ...data };
+  } else {
+    clients.push({ id: genId(), createdAt: new Date().toISOString(), ...data });
+  }
+
+  save();
+  closeModal('modal-client');
+  renderClients();
+}
+
+function selectOfferType(btn) {
+  document.querySelectorAll('#offer-type-btns .sub-type-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  const type = btn.dataset.type;
+  ['mobile','internet','streaming','musique','assurance','autre'].forEach(t => {
+    document.getElementById(`o-fields-${t}`).style.display = t === type ? 'block' : 'none';
+  });
+}
+
+function toggleOfferDataGo(checkbox) {
+  const input = document.getElementById('o-data');
+  input.style.opacity = checkbox.checked ? '0.3' : '1';
+  input.style.pointerEvents = checkbox.checked ? 'none' : 'auto';
+  if (checkbox.checked) input.value = '';
+}
+
+function selectAssurSub(btn) {
+  document.querySelectorAll('#assur-sub-btns .sub-type-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  const type = btn.dataset.type;
+  document.getElementById('o-assur-tech').style.display = type === 'tech' ? 'block' : 'none';
+  document.getElementById('o-assur-auto').style.display = type === 'auto' ? 'block' : 'none';
+  document.getElementById('o-assur-habitation').style.display = type === 'habitation' ? 'block' : 'none';
+}
+
+function addAssurAppareil() {
+  const select = document.getElementById('o-assur-appareil-select');
+  const name = select.value;
+  if (!name) return;
+
+  const list = document.getElementById('o-assur-appareils-list');
+  const id = 'ap-' + Date.now();
+  const card = document.createElement('div');
+  card.dataset.appareil = name;
+  card.id = id;
+  card.style.cssText = 'background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;';
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:13px;font-weight:700;color:var(--text);">${name}</span>
+      <button type="button" onclick="document.getElementById('${id}').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;">×</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div class="form-group">
+        <label class="form-label">Remboursement</label>
+        <select class="form-select ap-remboursement">
+          <option value="">— Choisir —</option>
+          <option value="À neuf">À neuf (valeur de remplacement)</option>
+          <option value="Valeur vénale">Valeur vénale (prix marché)</option>
+          <option value="Pourcentage">Pourcentage de la valeur</option>
+          <option value="Forfait fixe">Forfait fixe (montant défini)</option>
+          <option value="Réparation">Réparation uniquement</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Montant / %</label>
+        <input class="form-input ap-montant" placeholder="ex: 100%, 500€...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Plafond (€)</label>
+        <input class="form-input ap-plafond" type="number" placeholder="ex: 800">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nb sinistres/an</label>
+        <input class="form-input ap-sinistres" type="number" placeholder="ex: 2">
+      </div>
+    </div>
+  `;
+  list.appendChild(card);
+  select.value = '';
+}
+
+function getAssurAppareils() {
+  const list = document.getElementById('o-assur-appareils-list');
+  if (!list) return [];
+  return Array.from(list.children).map(card => ({
+    nom: card.dataset.appareil,
+    remboursement: card.querySelector('.ap-remboursement').value,
+    montant: card.querySelector('.ap-montant').value,
+    plafond: card.querySelector('.ap-plafond').value,
+    sinistres: card.querySelector('.ap-sinistres').value,
+  }));
+}
+
+function toggleOfferTv(checkbox) {
+  const wrap = document.getElementById('o-tv-price-wrap');
+  wrap.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+function toggleFrais(checkbox) {
+  const input = document.getElementById('o-frais');
+  input.style.opacity = checkbox.checked ? '0.3' : '1';
+  input.style.pointerEvents = checkbox.checked ? 'none' : 'auto';
+  if (checkbox.checked) input.value = '';
+}
+
+const DEFAULT_CONNEXIONS = ['Fibre', 'ADSL', '4G Box', '5G Box', 'Câble'];
+const DEFAULT_USERS = ['Foyer', 'Moi', 'Conjoint(e)', 'Enfant'];
+
+function getConnexions() {
+  const custom = JSON.parse(localStorage.getItem('ncc_connexions') || '[]');
+  return [...DEFAULT_CONNEXIONS, ...custom];
+}
+function getUsers() {
+  const custom = JSON.parse(localStorage.getItem('ncc_users') || '[]');
+  return [...DEFAULT_USERS, ...custom];
+}
+
+function checkNewSubOperator(select) {
+  const wrap = select.nextElementSibling;
+  wrap.style.display = select.value === '__new__' ? 'block' : 'none';
+}
+function addNewSubOperator(btn) {
+  const card = btn.closest('.sub-card');
+  const input = card.querySelector('.sub-new-op-input');
+  const name = input.value.trim();
+  if (!name) return;
+  saveOperator(name);
+  const select = card.querySelector('.sub-operator');
+  const opt = new Option(name, name, true, true);
+  select.insertBefore(opt, select.lastElementChild);
+  select.value = name;
+  card.querySelector('.sub-new-op-wrap').style.display = 'none';
+  input.value = '';
+}
+
+function checkNewSubUser(select) {
+  const wrap = select.nextElementSibling;
+  wrap.style.display = select.value === '__new__' ? 'block' : 'none';
+}
+function addNewSubUser(btn) {
+  const card = btn.closest('.sub-card');
+  const input = card.querySelector('.sub-new-user-input');
+  const name = input.value.trim();
+  if (!name) return;
+  const custom = JSON.parse(localStorage.getItem('ncc_users') || '[]');
+  if (!custom.includes(name) && !DEFAULT_USERS.includes(name)) {
+    custom.push(name);
+    localStorage.setItem('ncc_users', JSON.stringify(custom));
+  }
+  const select = card.querySelector('.sub-user');
+  const opt = new Option(name, name, true, true);
+  select.insertBefore(opt, select.lastElementChild);
+  select.value = name;
+  card.querySelector('.sub-new-user-wrap').style.display = 'none';
+  input.value = '';
+}
+
+function checkNewSubConnexion(select) {
+  const wrap = select.nextElementSibling;
+  wrap.style.display = select.value === '__new__' ? 'block' : 'none';
+}
+function addNewSubConnexion(btn) {
+  const card = btn.closest('.sub-card');
+  const input = card.querySelector('.sub-new-cx-input');
+  const name = input.value.trim();
+  if (!name) return;
+  const custom = JSON.parse(localStorage.getItem('ncc_connexions') || '[]');
+  if (!custom.includes(name) && !DEFAULT_CONNEXIONS.includes(name)) {
+    custom.push(name);
+    localStorage.setItem('ncc_connexions', JSON.stringify(custom));
+  }
+  const select = card.querySelector('.sub-connexion');
+  const opt = new Option(name, name, true, true);
+  select.insertBefore(opt, select.lastElementChild);
+  select.value = name;
+  card.querySelector('.sub-new-cx-wrap').style.display = 'none';
+  input.value = '';
+}
+
+// ---- OPERATEURS ----
+const DEFAULT_OPERATORS = ['Orange', 'SFR', 'Free', 'Bouygues Telecom', 'La Poste Mobile', 'NRJ Mobile', 'Réglo Mobile', 'Prixtel', 'Syma Mobile', 'Lebara', 'Auchan Telecom', 'Cdiscount Mobile'];
+
+function getOperators() {
+  const custom = JSON.parse(localStorage.getItem('ncc_operators') || '[]');
+  return [...DEFAULT_OPERATORS, ...custom].sort();
+}
+
+function saveOperator(name) {
+  const custom = JSON.parse(localStorage.getItem('ncc_operators') || '[]');
+  if (!custom.includes(name) && !DEFAULT_OPERATORS.includes(name)) {
+    custom.push(name);
+    localStorage.setItem('ncc_operators', JSON.stringify(custom));
+  }
+}
+
+function buildOperatorSelect(selectedVal = '') {
+  const select = document.getElementById('o-operator');
+  const operators = getOperators();
+  select.innerHTML = '<option value="">— Choisir —</option>';
+  operators.forEach(op => {
+    const opt = document.createElement('option');
+    opt.value = op;
+    opt.textContent = op;
+    if (op === selectedVal) opt.selected = true;
+    select.appendChild(opt);
+  });
+  const addOpt = document.createElement('option');
+  addOpt.value = '__new__';
+  addOpt.textContent = '＋ Ajouter un opérateur...';
+  select.appendChild(addOpt);
+}
+
+function checkNewOperator(select) {
+  const wrap = document.getElementById('new-operator-wrap');
+  if (select.value === '__new__') {
+    wrap.style.display = 'block';
+    document.getElementById('o-operator-new').focus();
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function addNewOperator() {
+  const input = document.getElementById('o-operator-new');
+  const name = input.value.trim();
+  if (!name) return;
+  saveOperator(name);
+  buildOperatorSelect(name);
+  input.value = '';
+  document.getElementById('new-operator-wrap').style.display = 'none';
+}
+
+// ---- SAVE OFFER ----
+function saveOffer() {
+  const typeBtn = document.querySelector('#offer-type-btns .sub-type-btn.selected');
+  const type = typeBtn ? typeBtn.dataset.type : 'autre';
+  const name = document.getElementById('o-name').value.trim();
+  const operator = document.getElementById('o-operator').value === '__new__' ? document.getElementById('o-operator-new').value.trim() : document.getElementById('o-operator').value.trim();
+  const price = document.getElementById('o-price').value;
+  if (!name || !price) { alert('Nom et prix obligatoires'); return; }
+
+  const offer = {
+    id: genOId(), type, name, operator, price,
+    notes: document.getElementById('o-notes').value.trim(),
+    fraisOfferts: document.getElementById('o-frais-offerts').checked,
+    frais: document.getElementById('o-frais-offerts').checked ? 0 : (parseFloat(document.getElementById('o-frais').value) || null),
+  };
+
+  if (type === 'mobile') {
+    const dataIllimite = document.getElementById('o-data-illimite').checked;
+    offer.dataIllimite = dataIllimite;
+    offer.data = dataIllimite ? '' : document.getElementById('o-data').value;
+    offer.calls = document.getElementById('o-calls').value;
+    offer.sms = document.getElementById('o-sms').value;
+    offer.engagement = document.getElementById('o-engagement').value;
+    offer.options = Array.from(document.querySelectorAll('#offer-options .checkbox-item.checked')).map(el => el.dataset.val);
+  } else if (type === 'internet') {
+    offer.debit = document.getElementById('o-debit').value;
+    offer.connexion = document.getElementById('o-connexion').value;
+    offer.engagement = document.getElementById('o-engagement-web').value;
+    offer.tvIncluse = document.getElementById('o-tv').checked;
+    offer.tvPrice = offer.tvIncluse ? document.getElementById('o-tv-price').value : '';
+  } else if (type === 'streaming') {
+    offer.qualite = document.getElementById('o-qualite').value;
+    offer.ecrans = document.getElementById('o-ecrans').value;
+    offer.profils = document.getElementById('o-profils').value;
+    offer.engagement = document.getElementById('o-engagement-stream').value;
+    offer.streamDownload = document.getElementById('o-stream-download').checked;
+    offer.streamFamille = document.getElementById('o-stream-famille').checked;
+  } else if (type === 'musique') {
+    offer.musicOffline = document.getElementById('o-music-offline').checked;
+    offer.musicComptes = document.getElementById('o-music-comptes').value;
+    offer.musicQualite = document.getElementById('o-music-qualite').value;
+  } else if (type === 'assurance') {
+    const assurSubBtn = document.querySelector('#assur-sub-btns .sub-type-btn.selected');
+    offer.assurSub = assurSubBtn ? assurSubBtn.dataset.type : '';
+    offer.assurFranchise = document.getElementById('o-assur-franchise').value;
+    offer.assurCarence = document.getElementById('o-assur-carence').value;
+    if (offer.assurSub === 'tech') {
+      offer.assurType = document.getElementById('o-assur-type').value;
+      offer.assurAppareils = getAssurAppareils();
+    } else if (offer.assurSub === 'auto') {
+      offer.autoNiveau = document.getElementById('o-auto-niveau').value;
+      offer.autoVehicule = document.getElementById('o-auto-vehicule').value;
+      offer.autoValeur = document.getElementById('o-auto-valeur').value;
+      offer.autoRemboursement = document.getElementById('o-auto-remboursement').value;
+      offer.autoProtectionJuridique = document.getElementById('o-auto-protection-juridique').checked;
+      offer.autoAssistance = document.getElementById('o-auto-assistance').checked;
+      offer.autoConducteur = document.getElementById('o-auto-conducteur').checked;
+      offer.autoPretVehicule = document.getElementById('o-auto-pret-vehicule').checked;
+    } else if (offer.assurSub === 'habitation') {
+      offer.habType = document.getElementById('o-hab-type').value;
+      offer.habStatut = document.getElementById('o-hab-statut').value;
+      offer.habCapital = document.getElementById('o-hab-capital').value;
+      offer.habSurface = document.getElementById('o-hab-surface').value;
+      offer.habDommages = document.getElementById('o-hab-dommages').checked;
+      offer.habBrisGlace = document.getElementById('o-hab-bris-glace').checked;
+      offer.habVol = document.getElementById('o-hab-vol').checked;
+      offer.habPj = document.getElementById('o-hab-pj').checked;
+      offer.habJardin = document.getElementById('o-hab-jardin').checked;
+    }
+  } else {
+    offer.autreDesc = document.getElementById('o-autre-desc').value;
+  }
+
+  offers.push(offer);
+  save();
+  closeModal('modal-offer');
+  renderOffers();
+  renderClients();
+}
+
+// ---- DELETE OFFER ----
+function deleteOffer(id) {
+  if (!confirm('Supprimer cette offre ?')) return;
+  offers = offers.filter(o => o.id !== id);
+  save();
+  renderOffers();
+  renderClients();
+}
+
+// ---- TOGGLE END DATE ----
+function toggleEndDate(checkbox) {
+  const wrap = checkbox.closest('.sub-card').querySelector('.sub-date-wrap');
+  if (checkbox.checked) {
+    wrap.style.opacity = '0.3';
+    wrap.style.pointerEvents = 'none';
+  } else {
+    wrap.style.opacity = '1';
+    wrap.style.pointerEvents = 'auto';
+  }
+}
+
+// ---- EXPORT MENU ----
+function toggleExportMenu() {
+  const menu = document.getElementById('export-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('export-menu-wrap').contains(e.target)) {
+    document.getElementById('export-menu').style.display = 'none';
+  }
+});
+
+// ---- EXPORT / IMPORT ----
+function toggleImportMenu() {
+  const menu = document.getElementById('import-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('import-menu-wrap').contains(e.target)) {
+    document.getElementById('import-menu').style.display = 'none';
+  }
+});
+
+function openImportPaste() {
+  document.getElementById('import-menu').style.display = 'none';
+  document.getElementById('import-textarea').value = '';
+  openModal('modal-import-paste');
+}
+
+function importFromPaste() {
+  const text = document.getElementById('import-textarea').value.trim();
+  if (!text) { alert('Veuillez coller votre sauvegarde d\'abord.'); return; }
+  try {
+    const data = JSON.parse(text);
+    if (!data.clients || !data.offers) throw new Error('Format invalide');
+    if (!confirm(`Importer ${data.clients.length} client(s) et ${data.offers.length} offre(s) ?\n\nAttention : cela remplacera vos données actuelles.`)) return;
+    clients = data.clients;
+    offers = data.offers;
+    if (data.customOperators) localStorage.setItem('ncc_operators', JSON.stringify(data.customOperators));
+    if (data.customUsers) localStorage.setItem('ncc_users', JSON.stringify(data.customUsers));
+    if (data.customConnexions) localStorage.setItem('ncc_connexions', JSON.stringify(data.customConnexions));
+    save();
+    renderClients();
+    renderOffers();
+    updateEchBadge();
+    closeModal('modal-import-paste');
+    alert('✅ Données importées avec succès !');
+  } catch(err) {
+    alert('❌ Texte invalide. Vérifiez que c\'est bien une sauvegarde NégoContract.');
+  }
+}
+
+function buildFullExportData() {
+  return {
+    clients, offers,
+    customOperators: JSON.parse(localStorage.getItem('ncc_operators') || '[]'),
+    customUsers: JSON.parse(localStorage.getItem('ncc_users') || '[]'),
+    customConnexions: JSON.parse(localStorage.getItem('ncc_connexions') || '[]'),
+    exportedAt: new Date().toISOString()
+  };
+}
+
+function exportData() {
+  document.getElementById('export-menu').style.display = 'none';
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    exportCopy();
+    return;
+  }
+  const data = buildFullExportData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toLocaleDateString('fr-FR').replace(/\//g, '-');
+  a.href = url;
+  a.download = `negocontract-sauvegarde-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCopy() {
+  document.getElementById('export-menu').style.display = 'none';
+  document.getElementById('export-textarea').value = JSON.stringify(buildFullExportData(), null, 2);
+  openModal('modal-export');
+}
+
+function copyExportText() {
+  const ta = document.getElementById('export-textarea');
+  ta.select();
+  document.execCommand('copy');
+  const btn = event.target;
+  btn.textContent = '✅ Copié !';
+  setTimeout(() => { btn.textContent = '📋 Tout copier'; }, 2000);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.clients || !data.offers) throw new Error('Format invalide');
+      if (!confirm(`Importer ${data.clients.length} client(s) et ${data.offers.length} offre(s) ?\n\nAttention : cela remplacera vos données actuelles.`)) return;
+      clients = data.clients;
+      offers = data.offers;
+      if (data.customOperators) localStorage.setItem('ncc_operators', JSON.stringify(data.customOperators));
+      if (data.customUsers) localStorage.setItem('ncc_users', JSON.stringify(data.customUsers));
+      if (data.customConnexions) localStorage.setItem('ncc_connexions', JSON.stringify(data.customConnexions));
+      save();
+      renderClients();
+      renderOffers();
+      updateEchBadge();
+      alert('✅ Données importées et synchronisées !');
+    } catch(err) {
+      alert('❌ Fichier invalide. Vérifiez que c\'est bien un fichier exporté depuis NégoContract.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ---- OFFERS RIGHT SIDEBAR ----
+let selectedOfferFilter = null;
+
+function toggleOffersSidebar() {
+  const sidebar = document.getElementById('offers-sidebar');
+  const toggle = document.getElementById('offers-sidebar-toggle');
+  sidebar.classList.toggle('collapsed');
+  toggle.classList.toggle('open');
+}
+
+function renderOffersSidebar() {
+  const list = document.getElementById('offers-sidebar-list');
+  const count = document.getElementById('offers-toggle-count');
+  count.textContent = offers.length || '';
+  count.style.display = offers.length ? 'flex' : 'none';
+
+  if (!offers.length) {
+    list.innerHTML = '<div style="padding:14px;font-size:12px;color:var(--text3);text-align:center;">Aucune offre<br>créée</div>';
+    return;
+  }
+
+  list.innerHTML = offers.map(o => {
+    const matched = clients.filter(c => matchScore(c, o) > 0).length;
+    const isActive = selectedOfferFilter === o.id;
+    return `<div class="offer-tab${isActive ? ' active' : ''}" onclick="selectOfferFilter('${o.id}')">
+      <div class="offer-tab-name">${o.name}</div>
+      ${o.type ? `<div class="offer-tab-op">${{mobile:'📱',internet:'🌐',streaming:'🎬',musique:'🎵',assurance:'🛡️',autre:'📦'}[o.type]||'📦'} ${o.operator||''}</div>` : o.operator ? `<div class="offer-tab-op">🏢 ${o.operator}</div>` : ''}
+      <div class="offer-tab-price">${parseFloat(o.price).toFixed(2)}€/mois</div>
+      <div class="offer-tab-match">👥 ${matched} client${matched > 1 ? 's' : ''} compatible${matched > 1 ? 's' : ''}</div>
+    </div>`;
+  }).join('');
+
+  // "Tous les clients" reset tab at top
+  list.innerHTML = `<div class="offer-tab${selectedOfferFilter === null ? ' active' : ''}" onclick="selectOfferFilter(null)" style="background:${selectedOfferFilter === null ? 'rgba(0,229,160,0.08)' : ''};border-left:${selectedOfferFilter === null ? '3px solid var(--accent)' : 'none'}">
+    <div class="offer-tab-name">👥 Tous les clients</div>
+    <div class="offer-tab-op">Aucun filtre actif</div>
+  </div>` + list.innerHTML;
+}
+
+function selectOfferFilter(offerId) {
+  selectedOfferFilter = offerId;
+  renderOffersSidebar();
+  renderClients();
+  if (offerId) showPage('clients');
+}
+
+// ---- SETTINGS ----
+function openSettings() {
+  const currentId = localStorage.getItem('ncc_bin_id') || '';
+  document.getElementById('settings-bin-id').value = currentId;
+  document.getElementById('settings-current-id').textContent = currentId
+    ? '✅ Bin ID : ' + currentId
+    : '⚠️ Aucun bin configuré — l\'app créera un nouveau bin à la prochaine sauvegarde.';
+  document.getElementById('settings-bin-status').textContent = '';
+  openModal('modal-settings');
+}
+
+function saveBinId() {
+  const id = document.getElementById('settings-bin-id').value.trim();
+  if (!id) {
+    document.getElementById('settings-bin-status').textContent = '❌ Veuillez saisir un ID.';
+    document.getElementById('settings-bin-status').style.color = 'var(--red)';
+    return;
+  }
+  BIN_ID = id;
+  localStorage.setItem('ncc_bin_id', id);
+  document.getElementById('settings-bin-status').textContent = '✅ ID enregistré ! Rechargement des données...';
+  document.getElementById('settings-bin-status').style.color = 'var(--accent)';
+  document.getElementById('settings-current-id').textContent = '✅ Bin ID : ' + id;
+  setTimeout(() => {
+    closeModal('modal-settings');
+    loadFromCloud();
+  }, 1200);
+}
+
+function forceSync() {
+  closeModal('modal-settings');
+  loadFromCloud();
+}
+
+// ---- LONG PRESS / DELETE CLIENT ----
+let longPressTimer = null;
+
+function startLongPress(event, clientId) {
+  longPressTimer = setTimeout(() => {
+    event.preventDefault();
+    confirmDeleteClient(clientId);
+  }, 600);
+}
+
+function cancelLongPress() {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+}
+
+function confirmDeleteClient(id) {
+  const c = clients.find(x => x.id === id);
+  if (!c) return;
+  const modal = document.getElementById('modal-client-action');
+  modal.dataset.clientId = id;
+  document.getElementById('action-client-name').textContent = c.firstname + ' ' + c.lastname;
+  openModal('modal-client-action');
+}
+
+function actionEditClient() {
+  const id = document.getElementById('modal-client-action').dataset.clientId;
+  closeModal('modal-client-action');
+  currentDetailClientId = id;
+  editCurrentClient();
+}
+
+function actionDeleteClient() {
+  const id = document.getElementById('modal-client-action').dataset.clientId;
+  const c = clients.find(x => x.id === id);
+  closeModal('modal-client-action');
+  document.getElementById('delete-client-name').textContent = c.firstname + ' ' + c.lastname;
+  document.getElementById('modal-delete-client').dataset.clientId = id;
+  openModal('modal-delete-client');
+}
+
+function doDeleteClient() {
+  const id = document.getElementById('modal-delete-client').dataset.clientId;
+  clients = clients.filter(c => c.id !== id);
+  save();
+  closeModal('modal-delete-client');
+  renderClients();
+  renderOffersSidebar();
+}
+
+// ---- CLOSE ON BACKDROP ----
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ---- SIDEBAR TOGGLE ----
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const btn = document.getElementById('sidebar-toggle');
+  sidebar.classList.toggle('collapsed');
+  btn.classList.toggle('open');
+}
+
+// ---- INIT ----
+loadFromCloud();
+// Start sidebar collapsed
+document.getElementById('offers-sidebar').classList.add('collapsed');
+</script>
+</body>
+</html>
